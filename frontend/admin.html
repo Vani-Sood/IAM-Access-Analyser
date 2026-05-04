@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <section class="hero-band" style="padding-bottom:var(--space-xl)">
+      <h1>Audit Log</h1>
+      <p class="subtitle">
+        Tamper-evident chain-hashed record of all system events. Admin only.
+      </p>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+    <!-- Content card -->
+    <div class="section-card">
+
+      <!-- Toolbar -->
+      <div class="history-toolbar">
+        <span class="history-filter-label">FILTER BY EVENT:</span>
+        <select id="event-type-filter" class="history-filter-select"
+                aria-label="Filter by event type">
+          <option value="">All Events</option>
+          <optgroup label="Auth">
+            <option value="user.login">user.login</option>
+            <option value="user.register">user.register</option>
+            <option value="user.password_change">user.password_change</option>
+          </optgroup>
+          <optgroup label="Org">
+            <option value="org.create">org.create</option>
+            <option value="org.member_add">org.member_add</option>
+            <option value="org.member_remove">org.member_remove</option>
+            <option value="org.member_role_change">org.member_role_change</option>
+          </optgroup>
+          <optgroup label="Analysis">
+            <option value="analysis.complete">analysis.complete</option>
+          </optgroup>
+        </select>
+
+        <button class="btn-secondary" id="export-btn" type="button"
+                style="margin-left:auto">
+          Export JSON
+        </button>
+        <span style="font-size:13px;color:var(--color-muted)" id="total-count"></span>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading" id="page-loading" role="status" aria-label="Loading"
+           style="margin:32px auto">
+        <div class="spinner"></div>
+        Loading audit log…
+      </div>
+
+      <!-- Empty state -->
+      <p id="audit-empty"
+         style="display:none;color:var(--color-muted);font-size:14px;
+                padding:var(--space-xl) 0;text-align:center">
+        No audit log entries yet.
+      </p>
+
+      <!-- Table -->
+      <div style="overflow-x:auto">
+        <table class="history-table" aria-label="Audit log">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Event</th>
+              <th>Actor</th>
+              <th>Payload</th>
+              <th>Hash</th>
+            </tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" id="pagination" aria-label="Pagination"></div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    if (!isAdmin()) {
+      window.location.href = "/index.html";
+    }
+    renderNav("admin");
+  </script>
+  <script src="admin.js"></script>
+
+</body>
+</html>

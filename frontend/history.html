@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analysis History — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <section class="hero-band" style="padding-bottom:var(--space-xl)">
+      <h1>Analysis History</h1>
+      <p class="subtitle">All past IAM policy analyses. Click a row to view full detail.</p>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+    <!-- Content card -->
+    <div class="section-card" style="padding:var(--space-xl)">
+
+      <!-- Toolbar -->
+      <div class="history-toolbar">
+        <span class="history-filter-label">FILTER BY SEVERITY:</span>
+        <select id="severity-filter" class="history-filter-select"
+                aria-label="Filter by severity">
+          <option value="">All</option>
+          <option value="CRITICAL">Critical</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </select>
+        <span style="margin-left:auto;font-size:13px;color:var(--color-muted)"
+              id="total-count"></span>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading" id="page-loading" role="status" aria-label="Loading"
+           style="margin:32px auto">
+        <div class="spinner"></div>
+        Loading history…
+      </div>
+
+      <!-- Empty state -->
+      <p id="history-empty"
+         style="display:none;color:var(--color-muted);font-size:14px;padding:var(--space-xl) 0;text-align:center">
+        No analyses yet.
+        <a href="analyze.html" style="color:var(--color-ink)">Run your first analysis →</a>
+      </p>
+
+      <!-- Table -->
+      <div style="overflow-x:auto">
+        <table class="history-table" aria-label="Analysis history">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Severity</th>
+              <th>Risk Score</th>
+              <th>Policy Hash</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" id="pagination" aria-label="Pagination"></div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("history");
+  </script>
+  <script src="history.js"></script>
+
+</body>
+</html>

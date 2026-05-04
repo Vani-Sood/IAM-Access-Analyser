@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analyze Policy — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav (populated by shared.js renderNav) -->
+  <div id="nav-root"></div>
+
+  <!-- Main Content -->
+  <main class="site-wrapper">
+
+    <!-- Hero Band -->
+    <section class="hero-band">
+      <h1>Analyze IAM Policy</h1>
+      <p class="subtitle">
+        Paste a policy JSON or run a live cloud scan.
+        Results open in the full analysis view.
+      </p>
+
+      <!-- Upload Card -->
+      <div class="upload-card">
+
+        <!-- Tab Bar -->
+        <div class="tab-bar" role="tablist">
+          <button class="tab-btn" data-tab="json" role="tab" aria-controls="panel-json"
+                  aria-selected="true" type="button">JSON Paste</button>
+          <button class="tab-btn" data-tab="live" role="tab" aria-controls="panel-live"
+                  aria-selected="false" type="button">Live Scan</button>
+        </div>
+
+        <!-- JSON Tab Panel -->
+        <div class="tab-panel" data-panel="json" id="panel-json" role="tabpanel">
+          <form id="policy-form">
+            <label for="policy-input">POLICY JSON</label>
+            <textarea
+              id="policy-input"
+              class="policy-textarea"
+              placeholder='{"Version":"2012-10-17","Statement":[...]}'
+              aria-label="IAM Policy JSON"
+            ></textarea>
+
+            <div class="drop-zone" id="drop-zone" role="button"
+                 aria-label="Drop JSON file here">
+              Drop a JSON file here, or click to browse
+              <input type="file" id="file-input" accept=".json"
+                     style="display:none" />
+            </div>
+
+            <div class="form-row" style="align-items:center;gap:12px">
+              <label for="cloud-select"
+                     style="font-size:13px;color:var(--color-muted);white-space:nowrap">
+                CLOUD:
+              </label>
+              <select id="cloud-select"
+                      style="height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--color-border);background:var(--color-canvas);color:var(--color-ink);font-size:14px">
+                <option value="aws">AWS</option>
+                <option value="azure">Azure</option>
+                <option value="gcp">GCP</option>
+              </select>
+              <button type="submit" class="btn-primary" id="analyze-btn">
+                Analyze Policy
+              </button>
+              <button type="button" class="btn-secondary" id="clear-btn">
+                Clear
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Live Scan Tab Panel -->
+        <div class="tab-panel hidden" data-panel="live" id="panel-live"
+             role="tabpanel">
+          <div class="live-info">
+            <strong>Live Scan</strong> connects to your cloud provider and
+            fetches IAM policies directly. The backend uses configured
+            credentials (environment variables or IAM role) — no keys are
+            sent from the browser.
+          </div>
+          <div class="form-row" style="align-items:center;gap:12px">
+            <label for="live-cloud-select"
+                   style="font-size:13px;color:var(--color-muted);white-space:nowrap">
+              CLOUD:
+            </label>
+            <select id="live-cloud-select"
+                    style="height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--color-border);background:var(--color-canvas);color:var(--color-ink);font-size:14px">
+              <option value="aws">AWS</option>
+              <option value="azure">Azure</option>
+              <option value="gcp">GCP</option>
+            </select>
+            <button type="button" class="btn-primary" id="live-scan-btn">
+              Run Live Scan
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading indicator (shared across tabs) -->
+        <div class="loading" id="loading" aria-label="Analyzing" role="status"
+             style="margin-top:16px">
+          <div class="spinner"></div>
+          Analyzing…
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("analyze");
+  </script>
+  <script src="analyze.js"></script>
+
+</body>
+</html>

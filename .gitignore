@@ -1,0 +1,53 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Playwright / E2E artifacts
+e2e/artifacts/
+e2e/screenshots/
+e2e/report/
+playwright-report/
+test-results/
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Generated output
+*.pdf
+*.xlsx
+iam_analyzer.pptx
+
+# Scratch / local docs
+everything.md
+implementation_blueprint.md
+make_pptx.py
+report/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

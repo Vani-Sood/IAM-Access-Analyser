@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <section class="hero-band" style="padding-bottom:var(--space-xl)">
+      <h1>Risk Dashboard</h1>
+      <p class="subtitle">Org-wide IAM risk metrics, severity breakdown, and action heatmap.</p>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+    <!-- Page loading -->
+    <div class="loading" id="page-loading" role="status" aria-label="Loading dashboard"
+         style="margin:48px auto">
+      <div class="spinner"></div>
+      Loading dashboard…
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Total Analyses</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-avg-risk">—</div>
+        <div class="stat-label">Avg Risk Score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-org"
+             style="font-size:20px;padding-top:8px">—</div>
+        <div class="stat-label">Scope</div>
+      </div>
+    </div>
+
+    <!-- Two-column layout: severity dist + trend chart -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:var(--space-lg);
+                margin-bottom:var(--space-xl)">
+
+      <!-- Severity Distribution -->
+      <div class="section-card">
+        <div class="section-title">Severity Distribution</div>
+        <div id="severity-dist"></div>
+      </div>
+
+      <!-- 30-day Trend Chart -->
+      <div class="section-card">
+        <div class="section-title">30-Day Trend</div>
+        <div class="trend-chart-wrapper">
+          <canvas id="trend-chart" aria-label="Trend chart"></canvas>
+        </div>
+        <p id="trend-empty" style="display:none;color:var(--color-muted);font-size:14px;
+           text-align:center;padding:var(--space-xl) 0">
+          No analyses in the last 30 days.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Heatmap: top 20 IAM actions -->
+    <div class="section-card" style="margin-bottom:var(--space-xl)">
+      <div class="section-title">Permission Heatmap</div>
+      <p style="font-size:13px;color:var(--color-muted);margin-bottom:var(--space-md)">
+        Top 20 IAM actions across all analyzed policies. Darker = more frequent.
+      </p>
+      <div class="heatmap-grid" id="heatmap-grid"></div>
+      <p id="heatmap-empty"
+         style="display:none;color:var(--color-muted);font-size:14px;text-align:center;
+                padding:var(--space-xl) 0">
+        No action data yet. Analyze some policies first.
+      </p>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("dashboard");
+  </script>
+  <script src="dashboard-page.js"></script>
+
+</body>
+</html>

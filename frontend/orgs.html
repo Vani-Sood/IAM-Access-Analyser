@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organizations — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <section class="hero-band" style="padding-bottom:var(--space-xl)">
+      <h1>Organizations</h1>
+      <p class="subtitle">Create orgs, manage members, and control access roles.</p>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+    <div class="orgs-layout">
+
+      <!-- Left: Org list + create form -->
+      <div>
+        <!-- Create org form -->
+        <div class="section-card" style="margin-bottom:var(--space-md)">
+          <div class="section-title">New Organization</div>
+          <form id="new-org-form">
+            <label style="font-size:12px;font-weight:600;color:var(--color-muted);
+                          text-transform:uppercase;letter-spacing:.04em;display:block;
+                          margin-bottom:4px" for="new-org-name">Name</label>
+            <input id="new-org-name" type="text" class="input-field"
+                   placeholder="Acme Corp" autocomplete="off"
+                   style="width:100%;margin-bottom:var(--space-sm)" required />
+
+            <label style="font-size:12px;font-weight:600;color:var(--color-muted);
+                          text-transform:uppercase;letter-spacing:.04em;display:block;
+                          margin-bottom:4px" for="new-org-slug">Slug</label>
+            <input id="new-org-slug" type="text" class="input-field"
+                   placeholder="acme-corp" autocomplete="off"
+                   style="width:100%;margin-bottom:var(--space-md)"
+                   pattern="[a-z0-9]+(-[a-z0-9]+)*" required />
+
+            <button type="submit" class="btn-primary" id="create-org-btn"
+                    style="width:100%">
+              Create Organization
+            </button>
+          </form>
+        </div>
+
+        <!-- Org list -->
+        <div class="section-card">
+          <div class="section-title">Your Organizations</div>
+          <div id="org-list"></div>
+          <p id="org-empty"
+             style="display:none;color:var(--color-muted);font-size:14px;
+                    padding:var(--space-md) 0">
+            No organizations yet. Create one above.
+          </p>
+        </div>
+      </div>
+
+      <!-- Right: Org detail + members -->
+      <div id="org-detail" style="display:none">
+        <div class="section-card">
+          <div class="section-title">
+            Members of <span id="detail-org-name"
+                             style="font-family:monospace;color:var(--color-brand-pink)"></span>
+          </div>
+
+          <!-- Members table -->
+          <div style="overflow-x:auto">
+            <table class="members-table" aria-label="Members">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="members-body"></tbody>
+            </table>
+          </div>
+          <p id="members-empty"
+             style="display:none;color:var(--color-muted);font-size:14px;
+                    padding:var(--space-md) 0">
+            No members found.
+          </p>
+
+          <!-- Add member form (hidden for non-admins) -->
+          <form id="add-member-form" style="display:none;margin-top:var(--space-lg);
+                border-top:1px solid var(--color-hairline);padding-top:var(--space-lg)">
+            <div class="section-title" style="margin-bottom:var(--space-md)">
+              Add Member
+            </div>
+            <div class="form-row" style="gap:var(--space-sm);align-items:flex-end">
+              <div style="flex:1">
+                <label style="font-size:12px;font-weight:600;color:var(--color-muted);
+                              text-transform:uppercase;letter-spacing:.04em;display:block;
+                              margin-bottom:4px" for="add-email">Email</label>
+                <input id="add-email" type="email" class="input-field"
+                       placeholder="user@example.com" autocomplete="off"
+                       style="width:100%" required />
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--color-muted);
+                              text-transform:uppercase;letter-spacing:.04em;display:block;
+                              margin-bottom:4px" for="add-role">Role</label>
+                <select id="add-role" class="history-filter-select">
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-primary" id="add-member-btn"
+                      style="height:38px">
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div><!-- /.orgs-layout -->
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("orgs");
+  </script>
+  <script src="orgs.js"></script>
+
+</body>
+</html>

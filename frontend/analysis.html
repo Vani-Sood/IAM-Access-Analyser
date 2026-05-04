@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analysis Detail — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <!-- Page loading spinner (shown until analysis loads) -->
+    <div class="loading" id="page-loading" role="status" aria-label="Loading analysis"
+         style="margin:48px auto">
+      <div class="spinner"></div>
+      Loading analysis…
+    </div>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div style="margin-bottom:var(--space-md);font-size:14px;color:var(--color-muted)">
+      <a href="analyze.html" style="color:var(--color-muted);text-decoration:none">← New Analysis</a>
+      &nbsp;·&nbsp;
+      <a href="history.html" style="color:var(--color-muted);text-decoration:none">History</a>
+      &nbsp;·&nbsp;
+      <span id="analysis-meta"></span>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="results-grid">
+
+      <!-- Risk Score Badge -->
+      <div id="risk-score" role="region" aria-label="Risk Score">
+        <div class="risk-number" id="score-number">—</div>
+        <div class="risk-label" id="score-label">Risk Score</div>
+        <div class="risk-label" id="severity-label"
+             style="margin-top:8px;font-size:14px"></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="section-card">
+        <div class="section-title">Summary</div>
+        <p id="findings-count"
+           style="font-size:32px;font-weight:500;letter-spacing:-1px"></p>
+        <p style="color:var(--color-muted);font-size:14px">security findings</p>
+      </div>
+
+      <!-- Findings -->
+      <div class="section-card" id="findings-panel" style="grid-column:1/-1">
+        <div class="section-title">Security Findings</div>
+        <div id="findings"></div>
+      </div>
+
+      <!-- Permission Graph -->
+      <div id="graph-container" class="section-card"
+           style="grid-column:1/-1;padding:0">
+        <div class="graph-header">
+          <h3>Permission Graph</h3>
+          <span style="font-size:13px;color:var(--color-muted)">
+            Policy → Statements → Actions → Resources
+          </span>
+          <button class="btn-secondary" id="fit-btn" type="button"
+                  style="height:32px;padding:6px 14px;font-size:13px">Fit</button>
+        </div>
+        <div id="cy"></div>
+        <div id="node-detail" class="node-detail-panel" style="display:none"
+             aria-label="Node detail">
+          <button class="detail-close" id="detail-close" type="button"
+                  aria-label="Close">✕</button>
+          <div class="detail-type"  id="detail-type"></div>
+          <div class="detail-label" id="detail-label"></div>
+          <div class="detail-meta"  id="detail-meta"></div>
+        </div>
+      </div>
+
+      <!-- AI Suggestions -->
+      <div class="section-card" id="suggestions" style="grid-column:1/-1">
+        <div class="section-title">AI Suggestions</div>
+        <div id="suggestions-content"></div>
+      </div>
+
+      <!-- Privilege Escalation Paths -->
+      <div class="section-card" id="privesc-section"
+           style="grid-column:1/-1;display:none">
+        <div class="section-title">Privilege Escalation Paths</div>
+        <p style="color:var(--color-muted);font-size:14px;margin-bottom:var(--space-md)">
+          Detect paths an identity could exploit to gain elevated permissions.
+        </p>
+        <button class="btn-secondary" id="load-privesc-btn" type="button">
+          Check Privilege Escalation
+        </button>
+        <div id="privesc-content" style="margin-top:var(--space-md)"></div>
+      </div>
+
+      <!-- Compliance Report -->
+      <div class="section-card" id="compliance-panel"
+           style="grid-column:1/-1;display:none">
+        <div class="section-title">Compliance Report</div>
+        <div class="compliance-toolbar">
+          <select id="compliance-framework" class="compliance-select">
+            <option value="cis">CIS AWS Benchmark v1.4</option>
+            <option value="nist">NIST 800-53</option>
+            <option value="soc2">SOC 2 CC6</option>
+            <option value="pci">PCI-DSS v3.2</option>
+            <option value="iso27001">ISO 27001</option>
+          </select>
+          <button class="btn-primary" id="run-compliance-btn" type="button">
+            Run Check
+          </button>
+          <button class="btn-secondary" id="export-compliance-btn" type="button"
+                  style="display:none">Export XLSX</button>
+        </div>
+        <div id="compliance-score-row" style="display:none"
+             class="compliance-score-row">
+          <div class="compliance-score-badge" id="compliance-score-badge">—</div>
+          <div class="compliance-counts" id="compliance-counts"></div>
+        </div>
+        <div id="compliance-controls-container" style="display:none">
+          <table class="compliance-table">
+            <thead>
+              <tr>
+                <th>Control ID</th><th>Title</th><th>Status</th>
+                <th>Risk</th><th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="compliance-controls-body"></tbody>
+          </table>
+        </div>
+        <div id="compliance-loading" class="loading" style="display:none">
+          <div class="spinner"></div>
+          Checking compliance…
+        </div>
+      </div>
+
+      <!-- Inheritance Lookup -->
+      <div class="section-card" id="inheritance-section"
+           style="grid-column:1/-1;display:none">
+        <div class="section-title">Inheritance Lookup</div>
+        <p style="color:var(--color-muted);font-size:14px;margin-bottom:var(--space-md)">
+          Find the lowest common ancestor (LCA) between any two nodes in the
+          permission graph.
+        </p>
+        <div class="inheritance-controls">
+          <select id="inheritance-from" class="compliance-select">
+            <option value="">Select first node…</option>
+          </select>
+          <select id="inheritance-to" class="compliance-select">
+            <option value="">Select second node…</option>
+          </select>
+          <button class="btn-primary" id="run-inheritance-btn" type="button">
+            Find Ancestor
+          </button>
+        </div>
+        <div id="inheritance-loading" class="loading" style="display:none">
+          <div class="spinner"></div>
+          Looking up…
+        </div>
+        <div id="inheritance-result" style="margin-top:var(--space-md)"></div>
+      </div>
+
+      <!-- PDF Report -->
+      <div class="section-card" id="report-panel"
+           style="grid-column:1/-1;display:none">
+        <div class="section-title">Analysis Report</div>
+        <p style="color:var(--color-muted);font-size:14px;margin-bottom:16px">
+          Download a full PDF report including risk score, privilege escalation
+          paths, findings, and recommendations.
+        </p>
+        <button class="btn-primary" id="download-report-btn" type="button">
+          Download PDF Report
+        </button>
+      </div>
+
+    </div><!-- /.results-grid -->
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("analyze");
+  </script>
+  <script src="analysis.js"></script>
+
+</body>
+</html>

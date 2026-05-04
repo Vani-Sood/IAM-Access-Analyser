@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — IAM Analyzer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <div id="nav-root"></div>
+
+  <!-- Main -->
+  <main class="site-wrapper">
+
+    <section class="hero-band" style="padding-bottom:var(--space-xl)">
+      <h1>Settings</h1>
+      <p class="subtitle">
+        API keys, webhooks, and account security.
+        <span id="org-context"
+              style="margin-left:8px;font-family:monospace;font-size:14px;
+                     color:var(--color-brand-pink)"></span>
+      </p>
+    </section>
+
+    <!-- Error / Success banners -->
+    <div class="error-banner" id="error-banner" role="alert">
+      <span id="error-message"></span>
+    </div>
+    <div class="error-banner" id="success-banner" role="status"
+         style="background:var(--color-surface-soft);border-left-color:var(--color-success);
+                color:var(--color-success)">
+      <span id="success-message"></span>
+    </div>
+
+    <!-- ── API Keys ────────────────────────────────────────────────────────── -->
+    <div class="section-card" style="margin-bottom:var(--space-xl)">
+      <div class="section-title">API Keys</div>
+      <p style="font-size:14px;color:var(--color-muted);margin-bottom:var(--space-lg)">
+        Keys authenticate API requests from CI/CD pipelines and external tools.
+        Scoped to the current organization.
+      </p>
+
+      <!-- Create key form -->
+      <form id="new-apikey-form"
+            style="display:flex;gap:var(--space-sm);align-items:flex-end;
+                   flex-wrap:wrap;margin-bottom:var(--space-lg)">
+        <div>
+          <label class="settings-label" for="new-key-name">Key Name</label>
+          <input id="new-key-name" type="text" class="input-field"
+                 placeholder="CI Pipeline" autocomplete="off"
+                 style="width:200px" required />
+        </div>
+        <div>
+          <label class="settings-label" for="new-key-scope">Scope</label>
+          <select id="new-key-scope" class="history-filter-select">
+            <option value="read">read</option>
+            <option value="readwrite">readwrite</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" id="create-key-btn">
+          Create Key
+        </button>
+      </form>
+
+      <!-- New key reveal (hidden until created) -->
+      <div id="new-key-result" style="display:none;margin-bottom:var(--space-lg);
+           background:var(--color-surface-soft);border:1px solid var(--color-hairline);
+           border-radius:var(--radius-md);padding:var(--space-md)">
+        <p style="font-size:13px;font-weight:600;color:var(--color-error);
+                  margin-bottom:var(--space-xs)">
+          Copy this key now — it will not be shown again.
+        </p>
+        <div style="display:flex;gap:var(--space-sm);align-items:center">
+          <input id="new-key-value" type="text" class="input-field"
+                 readonly style="flex:1;font-family:monospace;font-size:13px" />
+          <button type="button" id="copy-key-btn" class="btn-secondary"
+                  style="white-space:nowrap">Copy</button>
+        </div>
+      </div>
+
+      <!-- Keys table -->
+      <div style="overflow-x:auto">
+        <table class="history-table" aria-label="API keys">
+          <thead>
+            <tr>
+              <th>Name</th><th>Prefix</th><th>Scope</th>
+              <th>Created</th><th>Last Used</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="apikeys-body"></tbody>
+        </table>
+      </div>
+      <p id="apikeys-empty"
+         style="display:none;color:var(--color-muted);font-size:14px;
+                padding:var(--space-md) 0">
+        No API keys yet.
+      </p>
+    </div>
+
+    <!-- ── Webhooks ────────────────────────────────────────────────────────── -->
+    <div class="section-card" style="margin-bottom:var(--space-xl)">
+      <div class="section-title">Webhooks</div>
+      <p style="font-size:14px;color:var(--color-muted);margin-bottom:var(--space-lg)">
+        Receive HTTP POST notifications when analysis events occur.
+        URL must use HTTPS.
+      </p>
+
+      <!-- Register webhook form -->
+      <form id="new-webhook-form" style="margin-bottom:var(--space-lg)">
+        <div style="display:flex;gap:var(--space-sm);align-items:flex-end;
+                    flex-wrap:wrap;margin-bottom:var(--space-md)">
+          <div style="flex:1;min-width:240px">
+            <label class="settings-label" for="new-hook-url">URL</label>
+            <input id="new-hook-url" type="url" class="input-field"
+                   placeholder="https://hooks.example.com/iam"
+                   style="width:100%" required />
+          </div>
+        </div>
+        <div style="margin-bottom:var(--space-md)">
+          <span class="settings-label" style="display:block;margin-bottom:6px">Events</span>
+          <label class="hook-event-label">
+            <input type="checkbox" class="hook-event-cb" value="analysis.complete" />
+            analysis.complete
+          </label>
+          <label class="hook-event-label">
+            <input type="checkbox" class="hook-event-cb" value="privesc.detected" />
+            privesc.detected
+          </label>
+          <label class="hook-event-label">
+            <input type="checkbox" class="hook-event-cb" value="compliance.failed" />
+            compliance.failed
+          </label>
+        </div>
+        <button type="submit" class="btn-primary" id="create-hook-btn">
+          Register Webhook
+        </button>
+      </form>
+
+      <!-- Webhooks table -->
+      <div style="overflow-x:auto">
+        <table class="history-table" aria-label="Webhooks">
+          <thead>
+            <tr>
+              <th>URL</th><th>Events</th><th>Status</th>
+              <th>Failures</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="webhooks-body"></tbody>
+        </table>
+      </div>
+      <p id="webhooks-empty"
+         style="display:none;color:var(--color-muted);font-size:14px;
+                padding:var(--space-md) 0">
+        No webhooks registered yet.
+      </p>
+    </div>
+
+    <!-- ── Change Password ─────────────────────────────────────────────────── -->
+    <div class="section-card" style="max-width:480px">
+      <div class="section-title">Change Password</div>
+      <form id="password-form">
+        <label class="settings-label" for="current-password">Current Password</label>
+        <input id="current-password" type="password" class="input-field"
+               style="width:100%;margin-bottom:var(--space-md)"
+               autocomplete="current-password" required />
+
+        <label class="settings-label" for="new-password">New Password</label>
+        <input id="new-password" type="password" class="input-field"
+               style="width:100%;margin-bottom:var(--space-xs)"
+               autocomplete="new-password" required />
+        <p style="font-size:12px;color:var(--color-muted);margin-bottom:var(--space-md)">
+          Min 8 chars, 1 uppercase, 1 digit.
+        </p>
+
+        <label class="settings-label" for="confirm-password">Confirm New Password</label>
+        <input id="confirm-password" type="password" class="input-field"
+               style="width:100%;margin-bottom:var(--space-lg)"
+               autocomplete="new-password" required />
+
+        <button type="submit" class="btn-primary" id="change-password-btn">
+          Change Password
+        </button>
+      </form>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    IAM Policy Analyzer
+  </footer>
+
+  <script src="shared.js"></script>
+  <script>
+    requireAuth();
+    renderNav("settings");
+  </script>
+  <script src="settings.js"></script>
+
+</body>
+</html>

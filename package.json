@@ -1,0 +1,22 @@
+{
+  "name": "vaniproject",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:e2e": "playwright test"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["**/frontend/**/*.test.js"]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0"
+  }
+}
