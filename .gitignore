@@ -3,6 +3,13 @@
 .env.*
 !.env.example
 
+# Cloud credentials (never commit)
+*_accessKeys.csv
+*-service-account*.json
+iam-analyzer-scanner*.json
+gcp-key*.json
+aws-credentials*.csv
+
 # Python
 __pycache__/
 *.py[cod]

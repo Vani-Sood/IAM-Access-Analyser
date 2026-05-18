@@ -304,6 +304,58 @@ def test_to_dict_heatmap_item_keys():
         assert "count" in item
 
 
+# ── Tests: live scan policy_json update ──────────────────────────────────────
+
+def test_heatmap_uses_real_policy_from_live_scan(task_engine_b22):
+    """After a live scan completes, policy_json must contain the real policy
+    so the heatmap can aggregate it. This test verifies the pipeline stores
+    the actual scanned policy, not the placeholder {role_arn: null}."""
+    from unittest.mock import patch, MagicMock
+    from app.db.models import Analysis
+    from app.worker.tasks import run_analysis
+    from app.ingestion.parser import PolicyDoc, Statement
+    from app.analysis.dashboard import DashboardBuilder
+    from sqlalchemy.orm import Session
+
+    live_stmt = Statement.model_validate({
+        "Effect": "Allow",
+        "Action": ["s3:GetObject"],
+        "Resource": "arn:aws:s3:::test-bucket/*",
+    })
+    fake_policy = PolicyDoc(statement=[live_stmt])
+
+    with Session(task_engine_b22) as s:
+        rec = Analysis(
+            policy_hash="live_hm_test",
+            policy_json='{"role_arn": null}',
+            risk_score=0.0, severity="pending",
+            findings_json="[]", suggestions_json="{}",
+            graph_data_json='{"nodes":[],"edges":[]}',
+            status="pending",
+        )
+        s.add(rec)
+        s.commit()
+        s.refresh(rec)
+        analysis_id = rec.id
+
+    with patch("app.ingestion.live_scanners.aws.scan_live", return_value=fake_policy), \
+         patch("app.graph.neo4j_repository.GraphRepository.store_graph"), \
+         patch("app.ai.llm_client.call_llm", return_value='{"changes":[],"least_privilege_policy":null}'):
+        run_analysis(analysis_id, "live", None, None, cloud="aws",
+                     db_session=__import__("sqlalchemy.orm", fromlist=["Session"]).Session(task_engine_b22))
+
+    with Session(task_engine_b22) as s:
+        updated = s.get(Analysis, analysis_id)
+        import json as _json
+        stored = _json.loads(updated.policy_json)
+        assert "Statement" in stored, "policy_json should contain real policy after live scan"
+
+    with Session(task_engine_b22) as s:
+        updated = s.get(Analysis, analysis_id)
+        summary = DashboardBuilder([updated]).build()
+        assert len(summary.heatmap) > 0, "heatmap should show actions from live scan"
+
+
 # ── Tests: rescan_completed_analyses task ─────────────────────────────────────
 
 def test_rescan_task_callable():

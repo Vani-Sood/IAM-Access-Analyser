@@ -51,17 +51,8 @@
                      style="display:none" />
             </div>
 
+            <input type="hidden" id="cloud-select" value="auto" />
             <div class="form-row" style="align-items:center;gap:12px">
-              <label for="cloud-select"
-                     style="font-size:13px;color:var(--color-muted);white-space:nowrap">
-                CLOUD:
-              </label>
-              <select id="cloud-select"
-                      style="height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--color-border);background:var(--color-canvas);color:var(--color-ink);font-size:14px">
-                <option value="aws">AWS</option>
-                <option value="azure">Azure</option>
-                <option value="gcp">GCP</option>
-              </select>
               <button type="submit" class="btn-primary" id="analyze-btn">
                 Analyze Policy
               </button>
@@ -81,7 +72,7 @@
             credentials (environment variables or IAM role) — no keys are
             sent from the browser.
           </div>
-          <div class="form-row" style="align-items:center;gap:12px">
+          <div class="form-row" style="align-items:center;gap:12px;flex-wrap:wrap">
             <label for="live-cloud-select"
                    style="font-size:13px;color:var(--color-muted);white-space:nowrap">
               CLOUD:
@@ -95,6 +86,14 @@
             <button type="button" class="btn-primary" id="live-scan-btn">
               Run Live Scan
             </button>
+          </div>
+          <!-- Multi-account AWS Role ARN UI hidden for now. Single-account
+               direct scan uses AWS_ACCESS_KEY_ID/_SECRET in .env with the
+               SecurityAudit (or ReadOnlyAccess) managed policy attached to
+               that IAM user. To re-enable cross-account scans, restore the
+               live-aws-role-row block (see git history). -->
+          <div id="live-aws-role-row" hidden>
+            <input type="hidden" id="live-role-arn" value="">
           </div>
         </div>
 

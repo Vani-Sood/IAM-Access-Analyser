@@ -113,59 +113,106 @@ function renderHeatmap(heatmap) {
   }).join("");
 }
 
-// ── Render: trend chart (Chart.js) ───────────────────────────────────────────
+// ── Render: trend chart (D3 area chart) ──────────────────────────────────────
 function renderTrendChart(trend) {
-  const canvas = document.getElementById("trend-chart");
-  if (!canvas || !window.Chart) return;
-  const { labels, counts, avgRisks } = trendToChartData(trend);
+  const el = document.getElementById("trend-chart");
+  if (!el || typeof d3 === "undefined") return;
+  el.innerHTML = "";
+  if (!trend || !trend.length) return;
 
-  if (window._trendChart) { window._trendChart.destroy(); }
+  const data = trend.map(t => ({ date: t.date, count: t.count, risk: t.avg_risk }));
 
-  window._trendChart = new Chart(canvas, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          type: "bar",
-          label: "Analyses",
-          data: counts,
-          backgroundColor: "rgba(184, 164, 237, 0.6)",
-          borderColor: "rgba(184, 164, 237, 1)",
-          borderWidth: 1,
-          yAxisID: "yCount",
-        },
-        {
-          type: "line",
-          label: "Avg Risk",
-          data: avgRisks,
-          borderColor: "#ff4d8b",
-          backgroundColor: "transparent",
-          pointBackgroundColor: "#ff4d8b",
-          tension: 0.3,
-          yAxisID: "yRisk",
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: "index", intersect: false },
-      plugins: { legend: { position: "bottom" } },
-      scales: {
-        yCount: {
-          type: "linear", position: "left",
-          title: { display: true, text: "Analyses" },
-          ticks: { precision: 0 },
-        },
-        yRisk: {
-          type: "linear", position: "right",
-          min: 0, max: 10,
-          title: { display: true, text: "Avg Risk Score" },
-          grid: { drawOnChartArea: false },
-        },
-      },
-    },
-  });
+  const margin = { top: 20, right: 24, bottom: 48, left: 44 };
+  const totalW = el.clientWidth || 560;
+  const totalH = 220;
+  const W = totalW - margin.left - margin.right;
+  const H = totalH - margin.top - margin.bottom;
+
+  const svg = d3.select(el).append("svg")
+    .attr("width", "100%")
+    .attr("height", totalH)
+    .attr("viewBox", `0 0 ${totalW} ${totalH}`)
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  const defs = svg.append("defs");
+  const gradId = "trend-area-grad";
+  const grad = defs.append("linearGradient")
+    .attr("id", gradId).attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 1);
+  grad.append("stop").attr("offset", "0%")
+    .attr("stop-color", "#1a3a3a").attr("stop-opacity", 0.22);
+  grad.append("stop").attr("offset", "100%")
+    .attr("stop-color", "#1a3a3a").attr("stop-opacity", 0.02);
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scalePoint().domain(data.map(d => d.date)).range([0, W]).padding(0.3);
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.count) * 1.15 || 1])
+    .range([H, 0]).nice();
+
+  // Grid lines
+  g.append("g").attr("class", "grid")
+    .call(d3.axisLeft(y).ticks(5).tickSize(-W).tickFormat(""))
+    .call(gg => {
+      gg.select(".domain").remove();
+      gg.selectAll("line")
+        .attr("stroke", "#e5e5e5").attr("stroke-dasharray", "0");
+    });
+
+  // Area fill
+  const area = d3.area()
+    .x(d => x(d.date))
+    .y0(H).y1(d => y(d.count))
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  g.append("path").datum(data)
+    .attr("fill", `url(#${gradId})`)
+    .attr("d", area);
+
+  // Line
+  const line = d3.line()
+    .x(d => x(d.date))
+    .y(d => y(d.count))
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  g.append("path").datum(data)
+    .attr("fill", "none")
+    .attr("stroke", "#1a3a3a")
+    .attr("stroke-width", 2.2)
+    .attr("d", line);
+
+  // Dots
+  g.selectAll("circle").data(data).enter().append("circle")
+    .attr("cx", d => x(d.date))
+    .attr("cy", d => y(d.count))
+    .attr("r", 4)
+    .attr("fill", "#1a3a3a")
+    .attr("stroke", "#fffaf0")
+    .attr("stroke-width", 2);
+
+  // X axis
+  const maxTicks = Math.floor(W / 72);
+  const step = Math.max(1, Math.ceil(data.length / maxTicks));
+  const xTicks = data.filter((_, i) => i % step === 0).map(d => d.date);
+  g.append("g").attr("transform", `translate(0,${H})`)
+    .call(d3.axisBottom(x).tickValues(xTicks).tickSize(4))
+    .call(ax => {
+      ax.select(".domain").attr("stroke", "#e5e5e5");
+      ax.selectAll("text")
+        .attr("fill", "#6a6a6a").attr("font-size", 11)
+        .attr("transform", "rotate(-35)").attr("text-anchor", "end")
+        .attr("dx", "-0.4em").attr("dy", "0.6em");
+      ax.selectAll(".tick line").attr("stroke", "#e5e5e5");
+    });
+
+  // Y axis
+  g.append("g")
+    .call(d3.axisLeft(y).ticks(5).tickFormat(d3.format("d")))
+    .call(ax => {
+      ax.select(".domain").remove();
+      ax.selectAll("text").attr("fill", "#6a6a6a").attr("font-size", 11);
+      ax.selectAll(".tick line").attr("stroke", "#e5e5e5");
+    });
 }
 
 // ── Load dashboard data ───────────────────────────────────────────────────────

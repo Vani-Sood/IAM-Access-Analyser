@@ -62,7 +62,7 @@
       <div class="section-card">
         <div class="section-title">30-Day Trend</div>
         <div class="trend-chart-wrapper">
-          <canvas id="trend-chart" aria-label="Trend chart"></canvas>
+          <div id="trend-chart" aria-label="Trend chart"></div>
         </div>
         <p id="trend-empty" style="display:none;color:var(--color-muted);font-size:14px;
            text-align:center;padding:var(--space-xl) 0">
@@ -93,7 +93,7 @@
     IAM Policy Analyzer
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="d3.min.js"></script>
   <script src="shared.js"></script>
   <script>
     requireAuth();

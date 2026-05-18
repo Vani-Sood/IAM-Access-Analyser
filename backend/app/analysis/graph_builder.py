@@ -92,6 +92,31 @@ def _principal_label(principal: str | dict | list) -> str:
     return str(principal)
 
 
+_SERVICE_DISPLAY = {
+    "s3": "S3", "iam": "IAM", "ec2": "EC2", "lambda": "Lambda",
+    "rds": "RDS", "dynamodb": "DynamoDB", "kms": "KMS", "sts": "STS",
+    "sns": "SNS", "sqs": "SQS", "cloudwatch": "CloudWatch",
+    "logs": "CloudWatch Logs", "secretsmanager": "Secrets Mgr",
+    "cloudformation": "CloudFormation", "route53": "Route53",
+    "elasticloadbalancing": "ELB", "autoscaling": "Auto Scaling",
+}
+
+
+def _stmt_service_label(actions: list[str], effect: str, idx: int) -> str:
+    from collections import Counter
+    services: Counter = Counter()
+    for a in actions:
+        if ":" in a and a != "*":
+            services[a.split(":")[0].lower()] += 1
+    if not services:
+        return f"Stmt {idx} ({effect})"
+    top = services.most_common(1)[0][0]
+    svc_name = _SERVICE_DISPLAY.get(top, top.upper())
+    if len(services) > 1:
+        svc_name += f" +{len(services) - 1}"
+    return f"{svc_name} ({effect})"
+
+
 def build_graph(policy: PolicyDoc) -> GraphData:
     G: nx.DiGraph = nx.DiGraph()
 
@@ -116,7 +141,7 @@ def build_graph(policy: PolicyDoc) -> GraphData:
 
         # ── Statement node ────────────────────────────────────────────
         stmt_id = f"stmt_{idx}"
-        stmt_label = f"Stmt {idx} ({effect_value})"
+        stmt_label = _stmt_service_label(stmt.actions, effect_value, idx)
         nodes.append(NodeData(
             id=stmt_id,
             label=stmt_label,

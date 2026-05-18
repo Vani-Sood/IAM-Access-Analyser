@@ -172,3 +172,44 @@ def test_finding_has_message():
     p = make_policy([allow("iam:PassRole")])
     f = next(f for f in generate_findings(p) if f.rule_id == "IAM_PASS_ROLE")
     assert len(f.message) > 10
+
+
+# ── affected_resources ────────────────────────────────────────────────────────
+
+def test_finding_affected_resources_populated():
+    p = make_policy([allow("iam:PassRole", resource="arn:aws:iam::*:role/*")])
+    f = next(f for f in generate_findings(p) if f.rule_id == "IAM_PASS_ROLE")
+    assert "arn:aws:iam::*:role/*" in f.affected_resources
+
+
+def test_wildcard_resource_in_affected_resources():
+    p = make_policy([allow("s3:GetObject", resource="*")])
+    f = next(f for f in generate_findings(p) if f.rule_id == "WILDCARD_RESOURCE")
+    assert "*" in f.affected_resources
+
+
+# ── policy_source ─────────────────────────────────────────────────────────────
+
+def allow_with_sid(sid, actions, resource="*") -> dict:
+    return {"Sid": sid, "Effect": "Allow", "Action": actions, "Resource": resource}
+
+
+def test_finding_policy_source_from_sid():
+    p = make_policy([allow_with_sid("AllowPassRole", "iam:PassRole")])
+    f = next(f for f in generate_findings(p) if f.rule_id == "IAM_PASS_ROLE")
+    assert f.policy_source == "AllowPassRole"
+
+
+def test_finding_policy_source_fallback_statement_idx():
+    p = make_policy([allow("iam:PassRole")])
+    f = next(f for f in generate_findings(p) if f.rule_id == "IAM_PASS_ROLE")
+    assert f.policy_source == "Statement #0"
+
+
+def test_finding_policy_source_correct_idx_multi_statement():
+    p = make_policy([
+        allow("s3:GetObject", resource="arn:aws:s3:::bucket/*"),
+        allow_with_sid("DangerousPerms", "iam:*"),
+    ])
+    f = next(f for f in generate_findings(p) if f.rule_id == "IAM_WILDCARD")
+    assert f.policy_source == "DangerousPerms"

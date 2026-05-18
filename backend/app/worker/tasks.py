@@ -15,6 +15,7 @@ def run_analysis(
     policy_data: dict | None,
     role_arn: str | None,
     *,
+    cloud: str = "aws",
     db_session=None,
 ) -> None:
     """Full analysis pipeline. Separated from task for testability.
@@ -34,8 +35,17 @@ def run_analysis(
         db_session.commit()
 
         if mode == "live":
-            from app.ingestion.live_scanners.aws import scan_live
-            policy = scan_live(role_arn)
+            if cloud == "gcp":
+                from app.ingestion.live_scanners.gcp import GcpScanner
+                from app.ingestion.live_scanners._types import ScanTarget
+                policy = GcpScanner().scan(ScanTarget(cloud="gcp"))
+            elif cloud == "azure":
+                from app.ingestion.live_scanners.azure import AzureScanner
+                from app.ingestion.live_scanners._types import ScanTarget
+                policy = AzureScanner().scan(ScanTarget(cloud="azure"))
+            else:
+                from app.ingestion.live_scanners.aws import scan_live
+                policy = scan_live(role_arn)
         elif mode == "json" and policy_data is not None:
             from pydantic import ValidationError
             from app.ingestion.parser import PolicyDoc
@@ -48,6 +58,15 @@ def run_analysis(
         from app.analysis.risk_scorer import get_severity, score_policy
         from app.ingestion.expander import expand_wildcards
 
+        # For live scans the placeholder {"role_arn": ...} was stored at creation.
+        # Overwrite with the real policy so the heatmap can aggregate it.
+        # exclude_none=True avoids null optional fields polluting compliance checks.
+        real_policy_json: str | None = None
+        if mode == "live":
+            real_policy_json = json.dumps(
+                policy.model_dump(by_alias=True, exclude_none=True), sort_keys=True
+            )
+
         expanded = expand_wildcards(policy)
         risk_score = score_policy(policy)
         severity = get_severity(risk_score)
@@ -58,18 +77,35 @@ def run_analysis(
         from app.ai.llm_client import call_llm
         from app.ai.validator import validate_llm_output
         from app.ingestion.catalog import get_all_actions
+        from app.db.models import Analysis as _Analysis
 
-        valid_actions = set(get_all_actions())
-        system_prompt, user_prompt = build_suggestion_prompt(policy, findings, list(valid_actions))
-        try:
-            raw_llm = call_llm(system_prompt, user_prompt)
-            suggestions = validate_llm_output(raw_llm, valid_actions)
-        except Exception:
-            suggestions = {
-                "error": "ai_unavailable",
-                "least_privilege_policy": None,
-                "changes": [],
-            }
+        # Check cache — reuse suggestions from prior analysis with same policy hash
+        _rec = db_session.get(_Analysis, analysis_id)
+        _cached_sugg = (
+            repo.get_cached_suggestions(_rec.policy_hash, analysis_id)
+            if _rec else None
+        )
+        if _cached_sugg:
+            suggestions = json.loads(_cached_sugg)
+        else:
+            valid_actions = set(get_all_actions())
+            system_prompt, user_prompt = build_suggestion_prompt(policy, findings, list(valid_actions))
+            try:
+                raw_llm = call_llm(system_prompt, user_prompt)
+                suggestions = validate_llm_output(raw_llm, valid_actions)
+            except Exception as _ai_exc:
+                _msg = str(_ai_exc)
+                if "429" in _msg or "quota" in _msg.lower():
+                    _err = "quota_exceeded"
+                elif "api_key" in _msg.lower() or "api key" in _msg.lower() or "invalid" in _msg.lower():
+                    _err = "invalid_api_key"
+                else:
+                    _err = "ai_unavailable"
+                suggestions = {
+                    "error": _err,
+                    "least_privilege_policy": None,
+                    "changes": [],
+                }
 
         try:
             from app.graph.neo4j_repository import GraphRepository
@@ -84,6 +120,7 @@ def run_analysis(
             findings_json=json.dumps([f.model_dump() for f in findings]),
             suggestions_json=json.dumps(suggestions),
             graph_data_json=json.dumps(graph.to_dict()),
+            policy_json=real_policy_json,
         )
         db_session.commit()
 
@@ -104,8 +141,9 @@ def analyze_policy_task(
     mode: str,
     policy_data: dict | None,
     role_arn: str | None,
+    cloud: str = "aws",
 ) -> None:
-    run_analysis(analysis_id, mode, policy_data, role_arn)
+    run_analysis(analysis_id, mode, policy_data, role_arn, cloud=cloud)
 
 
 def _do_rescan(db_session) -> dict:

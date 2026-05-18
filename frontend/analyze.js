@@ -27,8 +27,28 @@ function buildJsonPayload(policy, cloud) {
   return { mode: "json", cloud, policy };
 }
 
-function buildLivePayload(cloud) {
-  return { mode: "live", cloud };
+const AWS_ROLE_ARN_RE =
+  /^arn:aws:iam::\d{12}:role\/[\w+=,.@/-]{1,512}$/;
+
+function validateRoleArn(arn) {
+  const trimmed = (arn || "").trim();
+  if (!trimmed) return null;
+  if (!AWS_ROLE_ARN_RE.test(trimmed)) {
+    throw new Error(
+      "Invalid Role ARN — expected arn:aws:iam::<account_id>:role/<name> " +
+        "(or leave blank for single-account direct scan)"
+    );
+  }
+  return trimmed;
+}
+
+function buildLivePayload(cloud, roleArn) {
+  const payload = { mode: "live", cloud };
+  if (cloud === "aws") {
+    const arn = validateRoleArn(roleArn);
+    if (arn) payload.role_arn = arn;
+  }
+  return payload;
 }
 
 function getActiveTab(hash) {
@@ -39,7 +59,13 @@ function getActiveTab(hash) {
 
 // ── conditional export ────────────────────────────────────────────────────────
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { validateJson, buildJsonPayload, buildLivePayload, getActiveTab };
+  module.exports = {
+    validateJson,
+    buildJsonPayload,
+    buildLivePayload,
+    validateRoleArn,
+    getActiveTab,
+  };
 }
 
 // ── browser-only DOM logic (skipped in Node/Jest) ─────────────────────────────
@@ -79,9 +105,12 @@ function switchTab(tab) {
   window.location.hash = tab;
 }
 
-async function pollStatus(analysisId, intervalMs = 2000, maxAttempts = 60) {
+async function pollStatus(analysisId, intervalMs = 2000, maxAttempts = 240) {
+  // Total budget ≈ 0.5s + 9*2s + 231*3s = ~12min.
+  // Live AWS/GCP scans can take 5+ min on accounts with many IAM entities.
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, i === 0 ? 500 : intervalMs));
+    const delay = i === 0 ? 500 : (i < 10 ? intervalMs : intervalMs + 1000);
+    await new Promise(r => setTimeout(r, delay));
     try {
       const resp = await fetch(`/api/v1/analyses/${analysisId}/status`, {
         headers: authHeaders(),
@@ -167,11 +196,18 @@ if (clearBtn) {
 }
 
 // ── Live scan form ────────────────────────────────────────────────────────────
+// Single-account direct mode only. Multi-account (sts:AssumeRole) ARN input
+// is hidden in analyze.html; re-enable both the markup block and the
+// roleArn read below to restore cross-account scans.
 const liveCloudSelect = document.getElementById("live-cloud-select");
 if (liveScanBtn) {
   liveScanBtn.addEventListener("click", () => {
     const cloud = liveCloudSelect ? liveCloudSelect.value : "aws";
-    submitPayload(buildLivePayload(cloud));
+    try {
+      submitPayload(buildLivePayload(cloud));
+    } catch (err) {
+      showError(err.message);
+    }
   });
 }
 

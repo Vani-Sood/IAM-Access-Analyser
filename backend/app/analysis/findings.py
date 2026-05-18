@@ -19,6 +19,8 @@ class Finding(BaseModel):
     severity: Severity
     message: str
     statement_idx: int
+    policy_source: str = ""
+    affected_resources: list[str] = []
 
 
 _DANGEROUS_ACTIONS: dict[str, tuple[str, Severity, str]] = {
@@ -110,12 +112,16 @@ def generate_findings(policy: PolicyDoc) -> list[Finding]:
     findings: list[Finding] = []
 
     for idx, stmt in enumerate(policy.statement):
+        source = stmt.sid or f"Statement #{idx}"
+
         if stmt.not_action is not None:
             findings.append(Finding(
                 rule_id="NOT_ACTION_USAGE",
                 severity=Severity.MEDIUM,
                 message="NotAction inverts permission logic; grants all actions except listed ones",
                 statement_idx=idx,
+                policy_source=source,
+                affected_resources=stmt.resources,
             ))
 
         if stmt.effect != Effect.ALLOW:
@@ -134,6 +140,8 @@ def generate_findings(policy: PolicyDoc) -> list[Finding]:
                 severity=severity,
                 message=message,
                 statement_idx=idx,
+                policy_source=source,
+                affected_resources=stmt.resources,
             ))
 
         if "*" in stmt.resources:
@@ -142,6 +150,8 @@ def generate_findings(policy: PolicyDoc) -> list[Finding]:
                 severity=Severity.MEDIUM,
                 message="Resource wildcard (*) grants access to every resource of the specified type",
                 statement_idx=idx,
+                policy_source=source,
+                affected_resources=stmt.resources,
             ))
 
         has_sensitive = any(a in _MFA_SENSITIVE for a in stmt.actions)
@@ -151,6 +161,8 @@ def generate_findings(policy: PolicyDoc) -> list[Finding]:
                 severity=Severity.MEDIUM,
                 message="Sensitive actions lack aws:MultiFactorAuthPresent condition",
                 statement_idx=idx,
+                policy_source=source,
+                affected_resources=stmt.resources,
             ))
 
     return findings

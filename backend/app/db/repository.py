@@ -45,6 +45,31 @@ class AnalysisRepository:
     def get_by_id(self, analysis_id: int) -> Analysis | None:
         return self._session.get(Analysis, analysis_id)
 
+    def get_cached_suggestions(self, policy_hash: str, exclude_id: int) -> str | None:
+        """Return suggestions_json from a prior completed analysis with same hash.
+
+        Skips analyses where the stored suggestions contain an error key.
+        """
+        stmt = (
+            select(Analysis)
+            .where(
+                Analysis.policy_hash == policy_hash,
+                Analysis.status == "completed",
+                Analysis.id != exclude_id,
+            )
+            .order_by(Analysis.id.desc())
+            .limit(5)
+        )
+        import json as _json
+        for row in self._session.scalars(stmt):
+            try:
+                s = _json.loads(row.suggestions_json or "{}")
+                if not s.get("error"):
+                    return row.suggestions_json
+            except Exception:
+                continue
+        return None
+
     def update_status(self, analysis_id: int, status: str) -> None:
         record = self._session.get(Analysis, analysis_id)
         if record:
@@ -64,6 +89,7 @@ class AnalysisRepository:
         findings_json: str,
         suggestions_json: str,
         graph_data_json: str,
+        policy_json: str | None = None,
     ) -> None:
         record = self._session.get(Analysis, analysis_id)
         if record:
@@ -73,6 +99,8 @@ class AnalysisRepository:
             record.suggestions_json = suggestions_json
             record.graph_data_json = graph_data_json
             record.status = "completed"
+            if policy_json is not None:
+                record.policy_json = policy_json
 
     def list_all(self, *, limit: int = 20, offset: int = 0) -> list[Analysis]:
         """Return personal (org_id IS NULL) analyses."""

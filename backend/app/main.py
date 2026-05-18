@@ -54,7 +54,7 @@ def _seed_admin() -> None:
             db.add(User(
                 email=admin_email,
                 hashed_password=hash_password(admin_password),
-                must_change_password=True,
+                must_change_password=False,
             ))
             db.commit()
     finally:

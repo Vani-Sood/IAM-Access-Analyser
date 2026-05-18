@@ -27,7 +27,7 @@ _ARN_RE = re.compile(r"^arn:aws:iam::\d{12}:role/[\w+=,.@/-]{1,512}$")
 
 class AnalyzeRequest(BaseModel):
     mode: Literal["json", "live"] = "json"
-    cloud: Literal["aws", "azure", "gcp"] = "aws"
+    cloud: Literal["aws", "azure", "gcp", "oci", "alibaba", "auto"] = "auto"
     policy: dict | None = None
     role_arn: str | None = None
 
@@ -42,8 +42,6 @@ class AnalyzeRequest(BaseModel):
     def check(self) -> "AnalyzeRequest":
         if self.mode == "json" and self.policy is None:
             raise ValueError("'policy' required when mode='json'")
-        if self.mode == "live" and self.role_arn is None:
-            raise ValueError("'role_arn' required when mode='live'")
         return self
 
 
@@ -63,6 +61,20 @@ def _normalize_policy(cloud: str, raw: dict) -> dict:
     Returns a dict that PolicyDoc.model_validate() can parse.
     Raises HTTPException(422) on invalid input.
     """
+    if cloud == "auto":
+        from app.ingestion.normalizers.detect import detect_cloud
+        detected = detect_cloud(raw)
+        if detected is None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Could not detect cloud provider from policy shape. "
+                    "Expected AWS (Statement), GCP (bindings/includedPermissions), "
+                    "or Azure (Actions/DataActions) format."
+                ),
+            )
+        cloud = detected
+
     if cloud == "aws":
         try:
             PolicyDoc.model_validate(raw)
@@ -74,14 +86,19 @@ def _normalize_policy(cloud: str, raw: dict) -> dict:
         if cloud == "azure":
             from app.ingestion.normalizers.azure import AzureNormalizer
             doc = AzureNormalizer().normalize(raw)
+        elif cloud == "oci":
+            from app.ingestion.normalizers.oci import OCINormalizer
+            doc = OCINormalizer().normalize(raw)
+        elif cloud == "alibaba":
+            from app.ingestion.normalizers.alibaba import AlibabaNormalizer
+            doc = AlibabaNormalizer().normalize(raw)
         else:  # gcp
             from app.ingestion.normalizers.gcp import GCPNormalizer
             doc = GCPNormalizer().normalize(raw)
     except (PolicyValidationError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # Return the normalized form as a plain dict for storage and worker processing
-    return doc.model_dump(by_alias=True)
+    return doc.model_dump(by_alias=True, exclude_none=True)
 
 
 @router.post("", response_model=AnalyzeResponse)
@@ -128,6 +145,7 @@ def analyze_policy(
         req.mode,
         policy_for_worker,
         req.role_arn,
+        req.cloud,
     )
 
     repo.update_task_id(record.id, task.id)

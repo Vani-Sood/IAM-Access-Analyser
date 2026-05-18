@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Analysis Detail — IAM Analyzer</title>
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.29.2/cytoscape.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+  <script src="d3.min.js"></script>
 </head>
 <body>
 
@@ -71,8 +69,20 @@
           <span style="font-size:13px;color:var(--color-muted)">
             Policy → Statements → Actions → Resources
           </span>
-          <button class="btn-secondary" id="fit-btn" type="button"
-                  style="height:32px;padding:6px 14px;font-size:13px">Fit</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <button class="btn-secondary" id="fit-btn" type="button"
+                    style="height:32px;padding:6px 14px;font-size:13px">Fit</button>
+            <button class="btn-secondary" id="lock-zoom-btn" type="button"
+                    style="height:32px;padding:6px 10px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;opacity:0.7"
+                    title="Lock zoom &amp; pan">
+              <svg id="lock-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path id="lock-shackle" d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <span id="lock-label">Lock</span>
+            </button>
+          </div>
         </div>
         <div id="cy"></div>
         <div id="node-detail" class="node-detail-panel" style="display:none"

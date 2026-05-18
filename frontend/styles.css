@@ -614,7 +614,7 @@ html, body {
   border-bottom: 1px solid var(--color-hairline);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
 .graph-header h3 {
@@ -1446,7 +1446,8 @@ html, body {
 /* ── Trend chart wrapper ─────────────────────────────────────────────────────── */
 .trend-chart-wrapper {
   position: relative;
-  height: 260px;
+  width: 100%;
+  min-height: 220px;
 }
 
 /* ── Orgs page layout ────────────────────────────────────────────────────────── */

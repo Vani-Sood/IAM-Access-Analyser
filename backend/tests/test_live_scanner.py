@@ -382,8 +382,10 @@ def test_analyze_request_json_mode_requires_policy():
         AnalyzeRequest(mode="json", policy=None)
 
 
-def test_analyze_request_live_mode_requires_role_arn():
-    from pydantic import ValidationError
+def test_analyze_request_live_mode_role_arn_optional():
+    """role_arn is optional: omitted → direct single-account scan via env-var creds."""
     from app.api.v1.analyze import AnalyzeRequest
-    with pytest.raises(ValidationError):
-        AnalyzeRequest(mode="live", role_arn=None)
+    req = AnalyzeRequest(mode="live", cloud="aws", role_arn=None)
+    assert req.role_arn is None
+    assert req.mode == "live"
+    assert req.cloud == "aws"

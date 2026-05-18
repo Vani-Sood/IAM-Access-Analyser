@@ -54,12 +54,12 @@ MOCK_LLM = '{"least_privilege_policy": {"Version":"2012-10-17","Statement":[]}, 
 def _make_sync_delay(test_engine, mock_llm):
     factory = sessionmaker(bind=test_engine, autocommit=False, autoflush=False)
 
-    def _delay(analysis_id, mode, policy_data, role_arn):
+    def _delay(analysis_id, mode, policy_data, role_arn, cloud="aws"):
         from app.worker.tasks import run_analysis
         db = factory()
         try:
             with patch("app.ai.llm_client.call_llm", return_value=mock_llm):
-                run_analysis(analysis_id, mode, policy_data, role_arn, db_session=db)
+                run_analysis(analysis_id, mode, policy_data, role_arn, cloud=cloud, db_session=db)
             db.commit()
         finally:
             db.close()
@@ -191,7 +191,7 @@ def test_gcp_empty_bindings_returns_422(client):
 # ── Invalid cloud value ───────────────────────────────────────────────────────
 
 def test_invalid_cloud_value_returns_422(client):
-    resp = client.post("/api/v1/analyze", json={"mode": "json", "cloud": "alibaba", "policy": AWS_POLICY})
+    resp = client.post("/api/v1/analyze", json={"mode": "json", "cloud": "unknown-cloud", "policy": AWS_POLICY})
     assert resp.status_code == 422
 
 

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     max_policy_size_kb: int = Field(default=20)
     rate_limit_per_hour: int = Field(default=10)
     jwt_secret: str = Field(default=_WEAK_SECRET)
-    jwt_access_ttl_minutes: int = Field(default=15)
+    jwt_access_ttl_minutes: int = Field(default=10080)
     jwt_refresh_ttl_days: int = Field(default=7)
     neo4j_uri: str = Field(default="bolt://localhost:7687")
     neo4j_user: str = Field(default="neo4j")
