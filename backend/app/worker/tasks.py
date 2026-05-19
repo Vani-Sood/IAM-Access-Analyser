@@ -123,10 +123,15 @@ def run_analysis(
 
             hooks = db_session.query(Webhook).filter(Webhook.is_active.is_(True)).all()
             if hooks:
+                parsed_findings = json.loads(findings_json_str)
+                top = parsed_findings[0]["message"] if parsed_findings else None
+
                 base_payload = {
                     "analysis_id": analysis_id,
                     "risk_score": round(risk_score, 2),
                     "severity": severity.value,
+                    "findings_count": len(parsed_findings),
+                    "top_finding": top,
                 }
 
                 privesc_paths = PrivescDetector(graph).detect()

@@ -11,13 +11,13 @@ def make_celery() -> Celery:
         "iam_analyzer",
         broker=settings.redis_url,
         backend=settings.redis_url,
-        include=["app.worker.tasks"],
+        include=["app.worker.tasks", "app.worker.webhook_delivery"],
     )
 
 
 celery = make_celery()
 
-celery.conf.include = ["app.worker.tasks"]
+celery.conf.include = ["app.worker.tasks", "app.worker.webhook_delivery"]
 
 celery.conf.beat_schedule = {
     "weekly-rescan": {

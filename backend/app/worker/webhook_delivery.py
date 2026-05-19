@@ -40,7 +40,7 @@ def _sign_payload(body: bytes, secret: str) -> str:
 
 
 def _is_discord_url(url: str) -> bool:
-    return "discord.com/api/webhooks/" in url
+    return "discord.com/api/webhooks/" in url or "discordapp.com/api/webhooks/" in url
 
 
 def _is_slack_url(url: str) -> bool:
@@ -55,28 +55,20 @@ def _discord_payload(event: str, data: dict) -> dict:
 
     fields = []
     if data.get("risk_score") is not None:
-        fields.append({
-            "name": "Risk Score",
-            "value": str(data["risk_score"]),
-            "inline": True,
-        })
+        fields.append({"name": "Risk Score", "value": f"`{data['risk_score']} / 10`", "inline": True})
     if data.get("severity"):
-        fields.append({
-            "name": "Severity",
-            "value": data["severity"].upper(),
-            "inline": True,
-        })
-    if data.get("framework"):
-        fields.append({
-            "name": "Framework",
-            "value": data["framework"].upper(),
-            "inline": True,
-        })
+        fields.append({"name": "Severity", "value": f"`{data['severity'].upper()}`", "inline": True})
+    if data.get("findings_count") is not None:
+        fields.append({"name": "Findings", "value": str(data["findings_count"]), "inline": True})
+    if data.get("paths_found") is not None:
+        fields.append({"name": "Privesc Paths", "value": str(data["paths_found"]), "inline": True})
+    if data.get("top_finding"):
+        fields.append({"name": "Top Finding", "value": data["top_finding"], "inline": False})
 
     return {
         "embeds": [{
             "title": f"{emoji} {title}",
-            "description": f"Analysis **#{analysis_id}** triggered this alert.",
+            "description": f"Analysis **#{analysis_id}** — [View Details](http://localhost:8000/analysis.html?id={analysis_id})",
             "color": color,
             "fields": fields,
             "footer": {"text": "IAM Policy Analyzer"},
@@ -125,9 +117,12 @@ def _do_deliver(
         if hook is None or not hook.is_active:
             return
 
-        subscribed = json.loads(hook.events)
-        if event not in subscribed:
-            return
+        # Test payloads bypass subscription check — always deliver
+        is_test = payload.get("test", False)
+        if not is_test:
+            subscribed = json.loads(hook.events)
+            if event not in subscribed:
+                return
 
         if _is_discord_url(hook.url):
             body_dict = _discord_payload(event, payload)
@@ -147,6 +142,8 @@ def _do_deliver(
             }
 
         resp = requests.post(hook.url, data=body, headers=headers, timeout=_TIMEOUT)
+        if not resp.ok:
+            logger.warning("Webhook %s got HTTP %s: %s", webhook_id, resp.status_code, resp.text[:200])
         resp.raise_for_status()
 
     except Exception as exc:
