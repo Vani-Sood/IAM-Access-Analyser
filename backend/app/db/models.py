@@ -119,8 +119,8 @@ class ApiKey(Base):
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), nullable=False)
-    org_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    org_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True
     )
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False

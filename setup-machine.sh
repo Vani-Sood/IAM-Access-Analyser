@@ -251,7 +251,29 @@ prompt_admin() {
   ok "Admin credentials saved to .env"
 }
 
-# ── 5b. Cloud CLI installers (awscli + gcloud) ───────────────────────────────
+# ── 5b. Gemini API key ───────────────────────────────────────────────────────
+
+prompt_gemini() {
+  echo
+  echo "${BLD}Gemini API Key (AI Suggestions)${RST}"
+  echo "Used to generate least-privilege policy suggestions after each analysis."
+  echo "Get a free key at: ${CYN}https://aistudio.google.com/apikey${RST}"
+  echo
+
+  local key
+  read -rsp "Gemini API key (press Enter to skip): " key; echo
+
+  if [ -z "$key" ]; then
+    warn "Skipping Gemini key. AI suggestions will show 'ai_unavailable' until set."
+    warn "Add later: edit .env → GEMINI_API_KEY=your-key → docker compose restart backend celery-worker"
+    return
+  fi
+
+  upsert_env GEMINI_API_KEY "$key"
+  ok "Gemini API key saved to .env"
+}
+
+# ── 5c. Cloud CLI installers (awscli + gcloud) ───────────────────────────────
 
 install_cloud_clis() {
   echo
@@ -625,6 +647,7 @@ main() {
   install_cloud_clis
   init_env
   prompt_admin
+  prompt_gemini
   select_clouds
   [ "${CHOSEN_AWS:-0}"   = "1" ] && prompt_cloud_aws   || warn "Skipping AWS.   Add later via .env (see getkeys.md §1)"
   [ "${CHOSEN_AZURE:-0}" = "1" ] && prompt_cloud_azure || warn "Skipping Azure. Add later via .env (see getkeys.md §2)"
