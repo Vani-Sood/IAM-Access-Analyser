@@ -77,35 +77,25 @@ def run_analysis(
         from app.ai.llm_client import call_llm
         from app.ai.validator import validate_llm_output
         from app.ingestion.catalog import get_all_actions
-        from app.db.models import Analysis as _Analysis
 
-        # Check cache — reuse suggestions from prior analysis with same policy hash
-        _rec = db_session.get(_Analysis, analysis_id)
-        _cached_sugg = (
-            repo.get_cached_suggestions(_rec.policy_hash, analysis_id)
-            if _rec else None
-        )
-        if _cached_sugg:
-            suggestions = json.loads(_cached_sugg)
-        else:
-            valid_actions = set(get_all_actions())
-            system_prompt, user_prompt = build_suggestion_prompt(policy, findings, list(valid_actions))
-            try:
-                raw_llm = call_llm(system_prompt, user_prompt)
-                suggestions = validate_llm_output(raw_llm, valid_actions)
-            except Exception as _ai_exc:
-                _msg = str(_ai_exc)
-                if "429" in _msg or "quota" in _msg.lower():
-                    _err = "quota_exceeded"
-                elif "api_key" in _msg.lower() or "api key" in _msg.lower() or "invalid" in _msg.lower():
-                    _err = "invalid_api_key"
-                else:
-                    _err = "ai_unavailable"
-                suggestions = {
-                    "error": _err,
-                    "least_privilege_policy": None,
-                    "changes": [],
-                }
+        valid_actions = set(get_all_actions())
+        system_prompt, user_prompt = build_suggestion_prompt(policy, findings, list(valid_actions))
+        try:
+            raw_llm = call_llm(system_prompt, user_prompt)
+            suggestions = validate_llm_output(raw_llm, valid_actions)
+        except Exception as _ai_exc:
+            _msg = str(_ai_exc)
+            if "429" in _msg or "quota" in _msg.lower():
+                _err = "quota_exceeded"
+            elif "api_key" in _msg.lower() or "api key" in _msg.lower() or "invalid" in _msg.lower():
+                _err = "invalid_api_key"
+            else:
+                _err = "ai_unavailable"
+            suggestions = {
+                "error": _err,
+                "least_privilege_policy": None,
+                "changes": [],
+            }
 
         try:
             from app.graph.neo4j_repository import GraphRepository

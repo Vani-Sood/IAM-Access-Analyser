@@ -13,6 +13,18 @@ from app.analysis.graph_builder import GraphData
 
 SUPPORTED_FRAMEWORKS = {"cis", "nist", "soc2", "pci", "iso27001"}
 
+
+def _get_condition(stmt: dict) -> dict:
+    """Return Condition as dict; guard against None, strings, or other non-dict values."""
+    cond = stmt.get("Condition")
+    return cond if isinstance(cond, dict) else {}
+
+
+def _fmt_actions(actions: list, n: int = 3) -> str:
+    if len(actions) <= n:
+        return str(actions)
+    return f"{actions[:n]} ... (+{len(actions) - n} more)"
+
 _DANGEROUS_IAM_ACTIONS = {
     "iam:*",
     "iam:passrole",
@@ -219,7 +231,7 @@ class ComplianceChecker:
                 continue
             actions = _normalize_list(stmt.get("Action", []))
             if "*" in actions or "iam:*" in actions:
-                details.append(f"Statement {i}: Action contains wildcard ({actions})")
+                details.append(f"Statement {i}: Action contains wildcard ({_fmt_actions(actions)})")
         return bool(details), details
 
     def _has_wildcard_resource_on_allow(self) -> tuple[bool, list[str]]:
@@ -230,7 +242,7 @@ class ComplianceChecker:
             resources = _normalize_list(stmt.get("Resource", []))
             if "*" in resources:
                 actions = _normalize_list(stmt.get("Action", []))
-                details.append(f"Statement {i}: Resource=* for actions {actions}")
+                details.append(f"Statement {i}: Resource=* for {len(actions)} actions {_fmt_actions(actions)}")
         return bool(details), details
 
     def _has_direct_user_principal(self) -> tuple[bool, bool, list[str]]:
@@ -279,7 +291,7 @@ class ComplianceChecker:
             ]
             if dangerous:
                 details.append(
-                    f"Statement {i}: dangerous actions {dangerous} on Resource=*"
+                    f"Statement {i}: {len(dangerous)} dangerous actions {_fmt_actions(dangerous)} on Resource=*"
                 )
         return bool(details), details
 
@@ -368,7 +380,7 @@ class ComplianceChecker:
             ]
             if matched:
                 details.append(
-                    f"Statement {i}: actions {matched} on Resource=*"
+                    f"Statement {i}: {len(matched)} actions {_fmt_actions(matched)} on Resource=*"
                 )
         return bool(details), details
 
@@ -413,7 +425,7 @@ class ComplianceChecker:
 
     def _has_mfa_condition(self, stmt: dict) -> bool:
         """True if stmt Condition has aws:MultiFactorAuthPresent = 'true'."""
-        cond = stmt.get("Condition", {})
+        cond = _get_condition(stmt)
         for op_val in cond.values():
             if not isinstance(op_val, dict):
                 continue
@@ -639,7 +651,7 @@ class ComplianceChecker:
         else:
             tls_fail: list[str] = []
             for i, stmt in s3_allow_stmts:
-                cond = stmt.get("Condition", {})
+                cond = _get_condition(stmt)
                 has_tls = any(
                     k.lower() == "aws:securetransport"
                     for op_val in cond.values()
@@ -649,8 +661,7 @@ class ComplianceChecker:
                 if not has_tls:
                     actions = _normalize_list(stmt.get("Action", []))
                     tls_fail.append(
-                        f"Statement {i}: S3 actions {actions} "
-                        f"without SecureTransport condition"
+                        f"Statement {i}: S3 {len(actions)} actions {_fmt_actions(actions)} without SecureTransport condition"
                     )
             if tls_fail:
                 tls_status = "FAIL"
@@ -711,7 +722,7 @@ class ComplianceChecker:
             ]
             if matched:
                 kms_fail.append(
-                    f"Statement {i}: KMS key destruction actions {matched}"
+                    f"Statement {i}: {len(matched)} KMS key destruction actions {_fmt_actions(matched)}"
                 )
         results.append(
             ControlResult(
@@ -1005,7 +1016,7 @@ class ComplianceChecker:
         else:
             sc28_fail: list[str] = []
             for i, stmt in s3_read_stmts:
-                cond = stmt.get("Condition", {})
+                cond = _get_condition(stmt)
                 has_enc = any(
                     k.lower() == "s3:x-amz-server-side-encryption"
                     for op_val in cond.values()
@@ -1015,8 +1026,7 @@ class ComplianceChecker:
                 if not has_enc:
                     actions = _normalize_list(stmt.get("Action", []))
                     sc28_fail.append(
-                        f"Statement {i}: S3 actions {actions} on * without "
-                        f"s3:x-amz-server-side-encryption condition"
+                        f"Statement {i}: S3 {len(actions)} actions {_fmt_actions(actions)} on * without s3:x-amz-server-side-encryption condition"
                     )
             if sc28_fail:
                 sc28_status = "FAIL"
@@ -1056,7 +1066,7 @@ class ComplianceChecker:
         else:
             sc8_fail: list[str] = []
             for i, stmt in s3_allow_stmts_nist:
-                cond = stmt.get("Condition", {})
+                cond = _get_condition(stmt)
                 has_tls = any(
                     k.lower() == "aws:securetransport"
                     for op_val in cond.values()
@@ -1066,8 +1076,7 @@ class ComplianceChecker:
                 if not has_tls:
                     actions = _normalize_list(stmt.get("Action", []))
                     sc8_fail.append(
-                        f"Statement {i}: S3 actions {actions} "
-                        f"without aws:SecureTransport condition"
+                        f"Statement {i}: S3 {len(actions)} actions {_fmt_actions(actions)} without aws:SecureTransport condition"
                     )
             if sc8_fail:
                 sc8_status = "WARNING"
@@ -1108,7 +1117,7 @@ class ComplianceChecker:
             ]
             if dangerous and not self._has_mfa_condition(stmt):
                 ia2_fail.append(
-                    f"Statement {i}: dangerous actions {dangerous} on * "
+                    f"Statement {i}: {len(dangerous)} dangerous actions {_fmt_actions(dangerous)} on * "
                     f"without MFA condition"
                 )
         results.append(
@@ -1153,7 +1162,7 @@ class ComplianceChecker:
             ]
             if matched and not self._has_mfa_condition(stmt):
                 cm5_fail.append(
-                    f"Statement {i}: policy change actions {matched} on * "
+                    f"Statement {i}: {len(matched)} policy change actions {_fmt_actions(matched)} on * "
                     f"without MFA condition"
                 )
         results.append(
@@ -1194,7 +1203,7 @@ class ComplianceChecker:
             ]
             if matched:
                 au9_fail.append(
-                    f"Statement {i}: CloudTrail disruption actions {matched}"
+                    f"Statement {i}: {len(matched)} CloudTrail disruption actions {_fmt_actions(matched)}"
                 )
         results.append(
             ControlResult(
@@ -1355,7 +1364,7 @@ class ComplianceChecker:
             ]
             if matched and not self._has_mfa_condition(stmt):
                 cc62_fail.append(
-                    f"Statement {i}: high-risk actions {matched} on * "
+                    f"Statement {i}: {len(matched)} high-risk actions {_fmt_actions(matched)} on * "
                     f"without MFA condition"
                 )
         results.append(
@@ -1445,7 +1454,7 @@ class ComplianceChecker:
             ]
             if matched:
                 cc71_fail.append(
-                    f"Statement {i}: CloudTrail disruption actions {matched}"
+                    f"Statement {i}: {len(matched)} CloudTrail disruption actions {_fmt_actions(matched)}"
                 )
         results.append(
             ControlResult(
@@ -1480,7 +1489,7 @@ class ComplianceChecker:
             ]
             if matched:
                 cc72_fail.append(
-                    f"Statement {i}: KMS key destruction actions {matched}"
+                    f"Statement {i}: {len(matched)} KMS key destruction actions {_fmt_actions(matched)}"
                 )
         results.append(
             ControlResult(
@@ -1542,7 +1551,7 @@ class ComplianceChecker:
             ]
             if matched:
                 cc82_warn.append(
-                    f"Statement {i}: infrastructure change actions {matched}"
+                    f"Statement {i}: {len(matched)} infrastructure change actions {_fmt_actions(matched)}"
                 )
         results.append(
             ControlResult(
@@ -1699,7 +1708,7 @@ class ComplianceChecker:
         else:
             tls_fail: list[str] = []
             for i, stmt in s3_allow_stmts:
-                cond = stmt.get("Condition", {})
+                cond = _get_condition(stmt)
                 has_tls = any(
                     k.lower() == "aws:securetransport"
                     for op_val in cond.values()
@@ -1709,7 +1718,7 @@ class ComplianceChecker:
                 if not has_tls:
                     actions = _normalize_list(stmt.get("Action", []))
                     tls_fail.append(
-                        f"Statement {i}: S3 actions {actions} without SecureTransport condition"
+                        f"Statement {i}: S3 {len(actions)} actions {_fmt_actions(actions)} without SecureTransport condition"
                     )
             if tls_fail:
                 pci41_status = "FAIL"
@@ -1949,7 +1958,7 @@ class ComplianceChecker:
         else:
             tls_fail2: list[str] = []
             for i, stmt in s3_allow_stmts:
-                cond = stmt.get("Condition", {})
+                cond = _get_condition(stmt)
                 has_tls = any(
                     k.lower() == "aws:securetransport"
                     for op_val in cond.values()
@@ -1959,7 +1968,7 @@ class ComplianceChecker:
                 if not has_tls:
                     actions = _normalize_list(stmt.get("Action", []))
                     tls_fail2.append(
-                        f"Statement {i}: S3 actions {actions} without SecureTransport condition"
+                        f"Statement {i}: S3 {len(actions)} actions {_fmt_actions(actions)} without SecureTransport condition"
                     )
             if tls_fail2:
                 iso131_status = "FAIL"

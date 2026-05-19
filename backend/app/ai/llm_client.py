@@ -32,13 +32,10 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
             return response.text
         except Exception as exc:
             last_exc = exc
-            code = getattr(getattr(exc, "status_code", None), "real", None) or getattr(exc, "status_code", 0)
-            # retry on 503/504; re-raise immediately on 429 (quota) or 4xx
-            if isinstance(code, int) and code not in _RETRYABLE_CODES:
-                raise
-            # extract HTTP code from error message if not on attribute
             msg = str(exc)
-            if "429" in msg or "quota" in msg.lower():
+            if "429" in msg or "quota" in msg.lower() or "api_key" in msg.lower() or "invalid" in msg.lower():
                 raise
-            # 503/504 or unknown server error — retry
+            if "503" not in msg and "504" not in msg and "service unavailable" not in msg.lower():
+                raise
+            # 503/504 — retry with back-off
     raise last_exc  # type: ignore[misc]

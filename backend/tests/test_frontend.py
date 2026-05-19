@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend"
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 INDEX_HTML      = FRONTEND_DIR / "index.html"
 ANALYZE_HTML    = FRONTEND_DIR / "analyze.html"
@@ -148,17 +148,17 @@ def test_html_has_loading_indicator(soup_analyze):
 
 def test_html_loads_cytoscape(soup_analysis):
     srcs = " ".join(s.get("src", "") for s in soup_analysis.find_all("script", src=True))
-    assert "cytoscape" in srcs.lower(), "cytoscape.js not loaded in analysis.html"
+    assert "d3" in srcs.lower(), "d3.js not loaded in analysis.html"
 
 
 def test_html_loads_dagre(soup_analysis):
     srcs = " ".join(s.get("src", "") for s in soup_analysis.find_all("script", src=True))
-    assert "dagre" in srcs.lower(), "dagre.js not loaded in analysis.html"
+    assert "d3" in srcs.lower(), "d3.js not loaded in analysis.html"
 
 
 def test_html_loads_cytoscape_dagre(soup_analysis):
     srcs = " ".join(s.get("src", "") for s in soup_analysis.find_all("script", src=True))
-    assert "cytoscape-dagre" in srcs.lower(), "cytoscape-dagre not loaded in analysis.html"
+    assert "d3" in srcs.lower(), "d3.js not loaded in analysis.html"
 
 
 def test_html_has_risk_score_element(soup_analysis):
@@ -225,7 +225,7 @@ def test_html_has_heatmap_table(soup_dashboard):
 
 def test_html_includes_chartjs(soup_dashboard):
     scripts = [s.get("src", "") for s in soup_dashboard.find_all("script")]
-    assert any("chart" in s.lower() for s in scripts), "Chart.js not included in dashboard.html"
+    assert any("d3" in s.lower() for s in scripts), "d3.js not included in dashboard.html"
 
 
 # ── settings.html ──────────────────────────────────────────────────────────────

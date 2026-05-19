@@ -93,23 +93,30 @@ function buildNodeOptions(nodes, allowedTypes) {
 }
 
 function renderInheritanceResult(data) {
+  const fromLabel = _nodeLabelMap[data.from_node] || data.from_node;
+  const toLabel   = _nodeLabelMap[data.to_node]   || data.to_node;
+  const sameAnc = data.from_node === data.lca_node_id || data.to_node === data.lca_node_id;
+  const note = sameAnc
+    ? `<p class="inheritance-note">One node is a direct ancestor of the other.</p>`
+    : "";
   return `
 <div class="inheritance-result">
   <div class="inheritance-chain">
-    <span class="chain-node chain-from">${escapeHtml(data.from_node)}</span>
+    <span class="chain-node chain-from">${escapeHtml(fromLabel)}</span>
     <span class="chain-arrow">→</span>
     <span class="chain-node chain-lca">
       <strong>${escapeHtml(data.lca_label)}</strong>
       <small class="lca-type">${escapeHtml(data.lca_node_type)}</small>
     </span>
     <span class="chain-arrow">←</span>
-    <span class="chain-node chain-to">${escapeHtml(data.to_node)}</span>
+    <span class="chain-node chain-to">${escapeHtml(toLabel)}</span>
   </div>
+  ${note}
 </div>`.trim();
 }
 
 function renderInheritanceEmpty() {
-  return '<p class="inheritance-empty">No common ancestor found for these nodes.</p>';
+  return '<p class="inheritance-empty">No common ancestor found — these nodes may be in separate policy trees or disconnected subgraphs.</p>';
 }
 
 // ── conditional export ────────────────────────────────────────────────────────
@@ -171,6 +178,9 @@ const inheritanceTo           = document.getElementById("inheritance-to");
 const runInheritanceBtn       = document.getElementById("run-inheritance-btn");
 const inheritanceLoadingEl    = document.getElementById("inheritance-loading");
 const inheritanceResult       = document.getElementById("inheritance-result");
+
+// node ID → label lookup, populated when graph loads
+let _nodeLabelMap = {};
 
 function showError(msg) {
   if (errorMsg)    errorMsg.textContent = msg;
@@ -601,11 +611,30 @@ async function loadAnalysis(id) {
 // ── Inheritance lookup ────────────────────────────────────────────────────────
 function populateInheritanceDropdowns(nodes) {
   if (!inheritanceFrom || !inheritanceTo) return;
-  const ALL_TYPES = ["policy", "statement", "action", "resource", "principal"];
-  const opts = buildNodeOptions(nodes, ALL_TYPES);
-  const optHtml = opts.map(n =>
-    `<option value="${escapeHtml(n.id)}">${escapeHtml(n.label)}</option>`
-  ).join("");
+
+  // Build global label lookup
+  _nodeLabelMap = {};
+  nodes.forEach(n => { _nodeLabelMap[n.id] = n.label; });
+
+  // Only tree-eligible nodes (principal/trust nodes won't appear in LCA tree)
+  const TREE_TYPES = ["policy", "statement", "action", "resource"];
+  const opts = buildNodeOptions(nodes, TREE_TYPES);
+
+  // Group by type for clarity
+  const groups = { policy: [], statement: [], action: [], resource: [] };
+  opts.forEach(n => { if (groups[n.node_type]) groups[n.node_type].push(n); });
+
+  const groupLabels = { policy: "Policy", statement: "Statements", action: "Actions", resource: "Resources" };
+  let optHtml = "";
+  for (const [type, label] of Object.entries(groupLabels)) {
+    if (!groups[type].length) continue;
+    optHtml += `<optgroup label="${label}">`;
+    optHtml += groups[type].map(n =>
+      `<option value="${escapeHtml(n.id)}">${escapeHtml(n.label)}</option>`
+    ).join("");
+    optHtml += "</optgroup>";
+  }
+
   inheritanceFrom.innerHTML = '<option value="">Select first node…</option>' + optHtml;
   inheritanceTo.innerHTML   = '<option value="">Select second node…</option>' + optHtml;
 }

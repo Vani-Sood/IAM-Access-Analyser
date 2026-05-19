@@ -36,7 +36,7 @@ MOCK_LLM = (
 def _make_sync_delay(engine, mock_llm):
     factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
-    def _delay(analysis_id, mode, policy_data, role_arn):
+    def _delay(analysis_id, mode, policy_data, role_arn, cloud="aws"):
         from app.worker.tasks import run_analysis
 
         db = factory()

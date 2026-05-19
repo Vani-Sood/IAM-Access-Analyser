@@ -5,6 +5,21 @@ import pytest
 
 from app.analysis.graph_builder import EdgeData, GraphData, NodeData
 
+
+def _docker_available() -> bool:
+    try:
+        import docker
+        docker.from_env(timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="Docker socket unavailable — skipping Neo4j testcontainer tests",
+)
+
 SIMPLE_GRAPH = GraphData(
     nodes=[
         NodeData(id="policy_root", label="Policy", node_type="policy"),

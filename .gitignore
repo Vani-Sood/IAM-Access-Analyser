@@ -47,6 +47,10 @@ iam_analyzer.pptx
 
 # Scratch / local docs
 everything.md
+CLAUDE.md
+DESIGN.md
+getkeys.md
+docs/*
 implementation_blueprint.md
 make_pptx.py
 report/

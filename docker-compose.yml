@@ -40,6 +40,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -51,6 +52,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       APP_ENV: ${APP_ENV:-development}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
       RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-1000}
       # AWS live scanner (optional)
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
@@ -76,9 +78,11 @@ services:
         condition: service_started
     volumes:
       - ./frontend:/app/frontend:ro
+      - ./backend/app:/app/app
 
   celery-worker:
     build: ./backend
+    restart: unless-stopped
     command: celery -A app.worker.celery_app.celery worker --loglevel=info --concurrency=2
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@postgres:5432/iam_analyzer
@@ -89,6 +93,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       APP_ENV: ${APP_ENV:-development}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
       RATE_LIMIT_PER_HOUR: ${RATE_LIMIT_PER_HOUR:-1000}
       # AWS live scanner (optional)
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
@@ -103,6 +108,8 @@ services:
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       GCP_SERVICE_ACCOUNT_KEY_JSON: ${GCP_SERVICE_ACCOUNT_KEY_JSON:-}
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+    volumes:
+      - ./backend/app:/app/app
     depends_on:
       postgres:
         condition: service_healthy

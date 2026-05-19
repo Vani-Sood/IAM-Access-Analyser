@@ -133,15 +133,23 @@ def test_gcp_scanner_error_does_not_leak_secret(monkeypatch):
 def _make_mock_iam_response(
     bindings: list[dict] | None = None,
 ) -> dict:
-    """Build a mock IAM policy response dict."""
     if bindings is None:
-        bindings = [
-            {
-                "role": "roles/viewer",
-                "members": ["user:alice@example.com"],
-            }
-        ]
+        bindings = [{"role": "roles/viewer", "members": ["user:alice@example.com"]}]
     return {"bindings": bindings, "etag": "ACAB", "version": 1}
+
+
+def _make_mock_session(iam_response: dict) -> MagicMock:
+    """Return a mock AuthorizedSession matching the new scanner API."""
+    mock_session = MagicMock()
+    post_resp = MagicMock()
+    post_resp.raise_for_status = MagicMock()
+    post_resp.json.return_value = iam_response
+    mock_session.post.return_value = post_resp
+    get_resp = MagicMock()
+    get_resp.ok = True
+    get_resp.json.return_value = {"roles": []}
+    mock_session.get.return_value = get_resp
+    return mock_session
 
 
 def test_gcp_scanner_happy_path(monkeypatch):
@@ -151,25 +159,12 @@ def test_gcp_scanner_happy_path(monkeypatch):
         '{"type": "service_account", "project_id": "my-project"}',
     )
 
-    mock_service = MagicMock()
-    mock_get_iam = MagicMock()
-    mock_get_iam.execute.return_value = _make_mock_iam_response()
-    mock_service.projects.return_value.getIamPolicy.return_value = (
-        mock_get_iam
-    )
+    mock_session = _make_mock_session(_make_mock_iam_response())
 
     with (
-        patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info"
-        ) as mock_creds_cls,
-        patch(
-            "googleapiclient.discovery.build",
-            return_value=mock_service,
-        ),
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=mock_session),
     ):
-        mock_creds_cls.return_value = MagicMock()
-
         from app.ingestion.live_scanners.gcp import GcpScanner
         from app.ingestion.live_scanners._types import ScanTarget
 
@@ -191,25 +186,12 @@ def test_gcp_scanner_happy_path_multiple_bindings(monkeypatch):
         {"role": "roles/viewer", "members": ["user:alice@example.com"]},
         {"role": "roles/editor", "members": ["user:bob@example.com"]},
     ]
-    mock_service = MagicMock()
-    mock_get_iam = MagicMock()
-    mock_get_iam.execute.return_value = _make_mock_iam_response(bindings)
-    mock_service.projects.return_value.getIamPolicy.return_value = (
-        mock_get_iam
-    )
+    mock_session = _make_mock_session(_make_mock_iam_response(bindings))
 
     with (
-        patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info"
-        ) as mock_creds_cls,
-        patch(
-            "googleapiclient.discovery.build",
-            return_value=mock_service,
-        ),
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=mock_session),
     ):
-        mock_creds_cls.return_value = MagicMock()
-
         from app.ingestion.live_scanners.gcp import GcpScanner
         from app.ingestion.live_scanners._types import ScanTarget
 
@@ -233,9 +215,10 @@ def test_gcp_scanner_wraps_sdk_exception(monkeypatch):
     )
 
     with (
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=MagicMock()),
         patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info",
+            "app.ingestion.live_scanners.gcp._fetch_project_bindings",
             side_effect=Exception("GCP API unreachable"),
         ),
     ):
@@ -253,25 +236,13 @@ def test_gcp_scanner_wraps_api_call_exception(monkeypatch):
         '{"type": "service_account", "project_id": "my-project"}',
     )
 
-    mock_service = MagicMock()
-    mock_get_iam = MagicMock()
-    mock_get_iam.execute.side_effect = Exception("API quota exceeded")
-    mock_service.projects.return_value.getIamPolicy.return_value = (
-        mock_get_iam
-    )
+    mock_session = MagicMock()
+    mock_session.post.side_effect = Exception("API quota exceeded")
 
     with (
-        patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info"
-        ) as mock_creds_cls,
-        patch(
-            "googleapiclient.discovery.build",
-            return_value=mock_service,
-        ),
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=mock_session),
     ):
-        mock_creds_cls.return_value = MagicMock()
-
         from app.ingestion.live_scanners.gcp import GcpScanner
         from app.ingestion.live_scanners._types import ScanTarget
 
@@ -290,25 +261,12 @@ def test_gcp_scanner_empty_bindings_returns_deny_all(monkeypatch):
         '{"type": "service_account", "project_id": "my-project"}',
     )
 
-    mock_service = MagicMock()
-    mock_get_iam = MagicMock()
-    mock_get_iam.execute.return_value = {"bindings": [], "etag": "ACAB"}
-    mock_service.projects.return_value.getIamPolicy.return_value = (
-        mock_get_iam
-    )
+    mock_session = _make_mock_session({"bindings": [], "etag": "ACAB"})
 
     with (
-        patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info"
-        ) as mock_creds_cls,
-        patch(
-            "googleapiclient.discovery.build",
-            return_value=mock_service,
-        ),
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=mock_session),
     ):
-        mock_creds_cls.return_value = MagicMock()
-
         from app.ingestion.live_scanners.gcp import GcpScanner
         from app.ingestion.live_scanners._types import ScanTarget
 
@@ -327,25 +285,12 @@ def test_gcp_scanner_no_bindings_key_returns_deny_all(monkeypatch):
         '{"type": "service_account", "project_id": "my-project"}',
     )
 
-    mock_service = MagicMock()
-    mock_get_iam = MagicMock()
-    mock_get_iam.execute.return_value = {"etag": "ACAB"}
-    mock_service.projects.return_value.getIamPolicy.return_value = (
-        mock_get_iam
-    )
+    mock_session = _make_mock_session({"etag": "ACAB"})
 
     with (
-        patch(
-            "google.oauth2.service_account.Credentials"
-            ".from_service_account_info"
-        ) as mock_creds_cls,
-        patch(
-            "googleapiclient.discovery.build",
-            return_value=mock_service,
-        ),
+        patch("app.ingestion.live_scanners.gcp._build_credentials", return_value=MagicMock()),
+        patch("app.ingestion.live_scanners.gcp._authed_session", return_value=mock_session),
     ):
-        mock_creds_cls.return_value = MagicMock()
-
         from app.ingestion.live_scanners.gcp import GcpScanner
         from app.ingestion.live_scanners._types import ScanTarget
 
