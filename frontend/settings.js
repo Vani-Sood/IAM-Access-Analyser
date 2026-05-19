@@ -112,6 +112,29 @@ function formatDate(isoStr) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+// ── Session Token section ─────────────────────────────────────────────────────
+const sessionTokenEl  = document.getElementById("session-token-value");
+const toggleTokenBtn  = document.getElementById("toggle-token-btn");
+const copyTokenBtn    = document.getElementById("copy-token-btn");
+
+if (sessionTokenEl) sessionTokenEl.value = getToken() || "";
+
+if (toggleTokenBtn && sessionTokenEl) {
+  toggleTokenBtn.addEventListener("click", () => {
+    const hidden = sessionTokenEl.type === "password";
+    sessionTokenEl.type = hidden ? "text" : "password";
+    toggleTokenBtn.textContent = hidden ? "Hide" : "Show";
+  });
+}
+
+if (copyTokenBtn && sessionTokenEl) {
+  copyTokenBtn.addEventListener("click", () => {
+    navigator.clipboard.writeText(sessionTokenEl.value).catch(() => {});
+    copyTokenBtn.textContent = "Copied!";
+    setTimeout(() => { copyTokenBtn.textContent = "Copy"; }, 2000);
+  });
+}
+
 // ── API Keys section ──────────────────────────────────────────────────────────
 const apiKeysBody    = document.getElementById("apikeys-body");
 const apiKeysEmpty   = document.getElementById("apikeys-empty");

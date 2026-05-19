@@ -16,12 +16,7 @@
 
     <section class="hero-band" style="padding-bottom:var(--space-xl)">
       <h1>Settings</h1>
-      <p class="subtitle">
-        API keys, webhooks, and account security.
-        <span id="org-context"
-              style="margin-left:8px;font-family:monospace;font-size:14px;
-                     color:var(--color-brand-pink)"></span>
-      </p>
+      <p class="subtitle">API keys, webhooks, and account security.</p>
     </section>
 
     <!-- Error / Success banners -->
@@ -32,6 +27,26 @@
          style="background:var(--color-surface-soft);border-left-color:var(--color-success);
                 color:var(--color-success)">
       <span id="success-message"></span>
+    </div>
+
+    <!-- ── Session Token ─────────────────────────────────────────────────── -->
+    <div class="section-card" style="margin-bottom:var(--space-xl)">
+      <div class="section-title">Session Token</div>
+      <p style="font-size:14px;color:var(--color-muted);margin-bottom:var(--space-lg)">
+        Your current Bearer token. Use this in curl commands or API clients to authenticate as yourself.
+        Expires when your session ends.
+      </p>
+      <div style="display:flex;gap:var(--space-sm);align-items:center;flex-wrap:wrap">
+        <input id="session-token-value" type="password" readonly class="input-field"
+               style="flex:1;min-width:200px;font-family:monospace;font-size:12px" />
+        <button type="button" id="toggle-token-btn" class="btn-secondary"
+                style="white-space:nowrap">Show</button>
+        <button type="button" id="copy-token-btn" class="btn-secondary"
+                style="white-space:nowrap">Copy</button>
+      </div>
+      <p style="font-size:12px;color:var(--color-muted);margin-top:8px">
+        Use as: <code>Authorization: Bearer &lt;token&gt;</code>
+      </p>
     </div>
 
     <!-- ── API Keys ────────────────────────────────────────────────────────── -->
