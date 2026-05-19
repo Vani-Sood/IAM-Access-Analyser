@@ -6,14 +6,13 @@ import secrets
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_user
 from app.db.database import get_db
-from app.db.models import ApiKey, Organization, User
-from app.db.org_repository import OrgRepository
+from app.db.models import ApiKey, User
 
 router = APIRouter(prefix="/api/v1/apikeys", tags=["apikeys"])
 
@@ -32,12 +31,20 @@ def _hash_key(raw: str) -> str:
 class CreateApiKeyRequest(BaseModel):
     name: str
     scope: str
+    expires_in_days: int | None = None  # None = never expires
 
     @field_validator("scope")
     @classmethod
     def scope_valid(cls, v: str) -> str:
         if v not in _VALID_SCOPES:
             raise ValueError(f"scope must be one of {_VALID_SCOPES}")
+        return v
+
+    @field_validator("expires_in_days")
+    @classmethod
+    def expiry_valid(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("expires_in_days must be at least 1")
         return v
 
 
@@ -49,6 +56,7 @@ class ApiKeyCreatedResponse(BaseModel):
     scope: str
     is_active: bool
     created_at: datetime
+    expires_at: datetime | None
 
 
 class ApiKeyListItem(BaseModel):
@@ -59,6 +67,7 @@ class ApiKeyListItem(BaseModel):
     is_active: bool
     created_at: datetime
     last_used_at: datetime | None
+    expires_at: datetime | None
 
 
 class ApiKeyListResponse(BaseModel):
@@ -69,17 +78,6 @@ class ApiKeyListResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _resolve_org(slug: str | None, user: User, db: Session):
-    if not slug:
-        raise HTTPException(status_code=400, detail="X-Org-Slug header required")
-    repo = OrgRepository(db)
-    org = repo.get_by_slug(slug)
-    if org is None:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    membership = repo.get_membership(org_id=org.id, user_id=user.id)
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Not a member of this organization")
-    return org
 
 
 # ---------------------------------------------------------------------------
@@ -89,25 +87,27 @@ def _resolve_org(slug: str | None, user: User, db: Session):
 @router.post("", response_model=ApiKeyCreatedResponse)
 def create_api_key(
     req: CreateApiKeyRequest,
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ApiKeyCreatedResponse:
-    org = _resolve_org(x_org_slug, current_user, db)
-
     raw = _PREFIX + secrets.token_urlsafe(32)
     prefix = raw[:len(_PREFIX) + 8]
     key_hash = _hash_key(raw)
+
+    from datetime import timedelta
+    now = datetime.now(tz=timezone.utc)
+    expires_at = (now + timedelta(days=req.expires_in_days)) if req.expires_in_days else None
 
     api_key = ApiKey(
         name=req.name,
         key_prefix=prefix,
         key_hash=key_hash,
         scope=req.scope,
-        org_id=org.id,
+        org_id=None,
         user_id=current_user.id,
         is_active=True,
-        created_at=datetime.now(tz=timezone.utc),
+        created_at=now,
+        expires_at=expires_at,
     )
     db.add(api_key)
     db.commit()
@@ -121,18 +121,16 @@ def create_api_key(
         scope=api_key.scope,
         is_active=api_key.is_active,
         created_at=api_key.created_at,
+        expires_at=api_key.expires_at,
     )
 
 
 @router.get("", response_model=ApiKeyListResponse)
 def list_api_keys(
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ApiKeyListResponse:
-    org = _resolve_org(x_org_slug, current_user, db)
-
-    keys = db.query(ApiKey).filter(ApiKey.org_id == org.id).all()
+    keys = db.query(ApiKey).filter(ApiKey.user_id == current_user.id).all()
     return ApiKeyListResponse(
         items=[
             ApiKeyListItem(
@@ -143,6 +141,7 @@ def list_api_keys(
                 is_active=k.is_active,
                 created_at=k.created_at,
                 last_used_at=k.last_used_at,
+                expires_at=k.expires_at,
             )
             for k in keys
         ]
@@ -152,14 +151,11 @@ def list_api_keys(
 @router.delete("/{key_id}", response_model=dict)
 def revoke_api_key(
     key_id: int,
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    org = _resolve_org(x_org_slug, current_user, db)
-
     key = db.query(ApiKey).filter(
-        ApiKey.id == key_id, ApiKey.org_id == org.id
+        ApiKey.id == key_id, ApiKey.user_id == current_user.id
     ).first()
     if key is None:
         raise HTTPException(status_code=404, detail="API key not found")

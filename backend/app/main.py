@@ -18,7 +18,6 @@ from app.api.v1.analyses import router as analyses_router
 from app.api.v1.apikeys import router as apikeys_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.orgs import router as orgs_router
 from app.api.v1.webhooks import router as webhooks_router
 from app.rate_limiter import limiter
 
@@ -55,6 +54,8 @@ def _seed_admin() -> None:
                 email=admin_email,
                 hashed_password=hash_password(admin_password),
                 must_change_password=False,
+                is_active=True,
+                is_admin=True,
             ))
             db.commit()
     finally:
@@ -105,7 +106,6 @@ app.include_router(analyze_router)
 app.include_router(analyses_router)
 app.include_router(apikeys_router)
 app.include_router(dashboard_router)
-app.include_router(orgs_router)
 app.include_router(webhooks_router)
 app.include_router(admin_router)
 

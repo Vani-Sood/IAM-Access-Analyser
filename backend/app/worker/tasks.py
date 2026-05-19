@@ -103,16 +103,43 @@ def run_analysis(
         except Exception:
             logger.warning("Neo4j unavailable — graph not persisted for analysis %s", analysis_id)
 
+        findings_json_str = json.dumps([f.model_dump() for f in findings])
         repo.update_results(
             analysis_id,
             risk_score=risk_score,
             severity=severity.value,
-            findings_json=json.dumps([f.model_dump() for f in findings]),
+            findings_json=findings_json_str,
             suggestions_json=json.dumps(suggestions),
             graph_data_json=json.dumps(graph.to_dict()),
             policy_json=real_policy_json,
         )
         db_session.commit()
+
+        # Fire webhooks async — analysis.complete always; privesc.detected if paths found
+        try:
+            from app.db.models import Webhook
+            from app.worker.webhook_delivery import deliver_webhook
+            from app.analysis.privesc import PrivescDetector
+
+            hooks = db_session.query(Webhook).filter(Webhook.is_active.is_(True)).all()
+            if hooks:
+                base_payload = {
+                    "analysis_id": analysis_id,
+                    "risk_score": round(risk_score, 2),
+                    "severity": severity.value,
+                }
+
+                privesc_paths = PrivescDetector(graph).detect()
+
+                for hook in hooks:
+                    deliver_webhook.delay(hook.id, "analysis.complete", base_payload)
+                    if privesc_paths:
+                        deliver_webhook.delay(hook.id, "privesc.detected", {
+                            **base_payload,
+                            "paths_found": len(privesc_paths),
+                        })
+        except Exception:
+            logger.warning("Webhook dispatch failed for analysis %s", analysis_id)
 
     except Exception:
         db_session.rollback()

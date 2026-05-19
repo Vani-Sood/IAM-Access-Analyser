@@ -98,6 +98,16 @@ class OrgRepository:
     def count_owners(self, org_id: int) -> int:
         stmt = select(Membership).where(
             Membership.org_id == org_id,
-            Membership.role == "owner",
+            Membership.role == "creator",
         )
         return len(list(self._db.scalars(stmt)))
+
+    def get_creator_user_id(self, org_id: int) -> int | None:
+        """Return user_id of the original org creator (lowest membership id)."""
+        stmt = (
+            select(Membership.user_id)
+            .where(Membership.org_id == org_id)
+            .order_by(Membership.id.asc())
+            .limit(1)
+        )
+        return self._db.scalar(stmt)

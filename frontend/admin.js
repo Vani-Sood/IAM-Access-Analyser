@@ -215,5 +215,146 @@ if (exportBtn) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 const startPage = auditGetPage(window.location.search);
 loadPage(startPage);
+loadUsers();
 
 } // end browser-only block
+
+// ── User management (runs in browser only) ────────────────────────────────────
+if (typeof window !== "undefined") {
+
+const createUserForm    = document.getElementById("create-user-form");
+const createUserErrBanner = document.getElementById("create-user-error");
+const createUserErrMsg  = document.getElementById("create-user-error-msg");
+const createUserSuccess = document.getElementById("create-user-success");
+const createUserBtn     = document.getElementById("create-user-btn");
+
+if (createUserForm) {
+  createUserForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (createUserErrBanner) createUserErrBanner.classList.remove("active");
+    if (createUserSuccess)   createUserSuccess.style.display = "none";
+    const email    = document.getElementById("new-user-email").value.trim();
+    const password = document.getElementById("new-user-password").value;
+    const isAdmin  = document.getElementById("new-user-is-admin").checked;
+    if (createUserBtn) createUserBtn.disabled = true;
+    try {
+      const resp = await fetch("/api/v1/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ email, password, is_admin: isAdmin }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        if (createUserErrMsg) createUserErrMsg.textContent = data.detail || `Failed (${resp.status})`;
+        if (createUserErrBanner) createUserErrBanner.classList.add("active");
+        return;
+      }
+      document.getElementById("new-user-email").value = "";
+      document.getElementById("new-user-password").value = "";
+      document.getElementById("new-user-is-admin").checked = false;
+      if (createUserSuccess) {
+        createUserSuccess.textContent = `User ${data.email} created. They must change password on first login.`;
+        createUserSuccess.style.display = "";
+      }
+      await loadUsers();
+    } catch (err) {
+      if (createUserErrMsg) createUserErrMsg.textContent = `Network error: ${err.message}`;
+      if (createUserErrBanner) createUserErrBanner.classList.add("active");
+    } finally {
+      if (createUserBtn) createUserBtn.disabled = false;
+    }
+  });
+}
+
+async function loadUsers() {
+  try {
+    const resp = await fetch("/api/v1/admin/users", { headers: authHeaders() });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderPendingUsers(data.items.filter(u => !u.is_active));
+    renderAllUsers(data.items);
+  } catch (_) {}
+}
+
+function renderPendingUsers(users) {
+  const tbody   = document.getElementById("pending-body");
+  const empty   = document.getElementById("pending-empty");
+  const table   = document.getElementById("pending-table");
+  if (!tbody) return;
+  if (!users.length) {
+    if (empty) empty.style.display = "";
+    if (table) table.style.display = "none";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+  if (table) table.style.display = "";
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td style="font-weight:600">${escapeHtml(u.email)}</td>
+      <td style="font-size:13px;color:var(--color-muted)">${new Date(u.created_at).toLocaleString()}</td>
+      <td>
+        <button class="btn-primary approve-btn" data-user-id="${u.id}"
+                style="font-size:13px;padding:4px 12px">
+          Approve
+        </button>
+      </td>
+    </tr>`).join("");
+  tbody.querySelectorAll(".approve-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Approving…";
+      try {
+        const resp = await fetch(`/api/v1/admin/users/${btn.dataset.userId}/activate`, {
+          method: "POST", headers: authHeaders(),
+        });
+        if (!resp.ok) { btn.disabled = false; btn.textContent = "Approve"; return; }
+        await loadUsers();
+      } catch (_) { btn.disabled = false; btn.textContent = "Approve"; }
+    });
+  });
+}
+
+function renderAllUsers(users) {
+  const tbody = document.getElementById("users-body");
+  if (!tbody) return;
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="finding-badge" style="background:${u.is_active ? "var(--color-ok,#22c55e)" : "var(--color-error,#ef4444)"}20;
+               color:${u.is_active ? "var(--color-ok,#16a34a)" : "var(--color-error,#dc2626)"}">
+        ${u.is_active ? "Active" : "Pending"}
+      </span></td>
+      <td><span class="finding-badge">${u.is_admin ? "Admin" : "User"}</span></td>
+      <td style="font-size:13px;color:var(--color-muted)">${new Date(u.created_at).toLocaleString()}</td>
+      <td>
+        ${u.is_active
+          ? `<button class="btn-secondary deactivate-btn" data-user-id="${u.id}"
+                     style="font-size:13px;padding:4px 10px;color:var(--color-error)">
+               Deactivate
+             </button>`
+          : `<button class="btn-primary approve-btn2" data-user-id="${u.id}"
+                     style="font-size:13px;padding:4px 12px">
+               Approve
+             </button>`
+        }
+      </td>
+    </tr>`).join("");
+
+  tbody.querySelectorAll(".approve-btn2").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await fetch(`/api/v1/admin/users/${btn.dataset.userId}/activate`,
+        { method: "POST", headers: authHeaders() });
+      await loadUsers();
+    });
+  });
+  tbody.querySelectorAll(".deactivate-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Deactivate this user? They won't be able to log in.")) return;
+      await fetch(`/api/v1/admin/users/${btn.dataset.userId}`,
+        { method: "DELETE", headers: authHeaders() });
+      await loadUsers();
+    });
+  });
+}
+
+}

@@ -35,7 +35,7 @@ function getUserPayload() {
 
 function isAdmin() {
   const p = getUserPayload();
-  return p?.role === "admin";
+  return p?.is_admin === true;
 }
 
 // ── single-flight refresh state ───────────────────────────────────────────────
@@ -123,7 +123,6 @@ function renderNav(activePage) {
     { href: "analyze.html",   label: "Analyze",   key: "analyze"   },
     { href: "history.html",   label: "History",   key: "history"   },
     { href: "dashboard.html", label: "Dashboard", key: "dashboard" },
-    { href: "orgs.html",      label: "Orgs",      key: "orgs"      },
     { href: "settings.html",  label: "Settings",  key: "settings"  },
   ];
   if (admin) links.push({ href: "admin.html", label: "Admin", key: "admin" });

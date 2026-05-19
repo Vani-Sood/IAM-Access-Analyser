@@ -50,8 +50,10 @@ function validatePasswordMatch(password, confirm) {
   return password;
 }
 
-function buildApiKeyPayload(name, scope) {
-  return { name, scope };
+function buildApiKeyPayload(name, scope, expiresInDays) {
+  const payload = { name, scope };
+  if (expiresInDays) payload.expires_in_days = expiresInDays;
+  return payload;
 }
 
 function buildWebhookPayload(url, events) {
@@ -110,30 +112,13 @@ function formatDate(isoStr) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-// ── Org slug from first org ───────────────────────────────────────────────────
-let orgSlug = null;
-
-async function resolveOrgSlug() {
-  try {
-    const resp = await fetch("/api/v1/orgs", { headers: authHeaders() });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return data.items.length ? data.items[0].slug : null;
-  } catch { return null; }
-}
-
-function orgHeaders() {
-  return orgSlug
-    ? { ...authHeaders(), "X-Org-Slug": orgSlug }
-    : authHeaders();
-}
-
 // ── API Keys section ──────────────────────────────────────────────────────────
 const apiKeysBody    = document.getElementById("apikeys-body");
 const apiKeysEmpty   = document.getElementById("apikeys-empty");
 const newKeyForm     = document.getElementById("new-apikey-form");
 const newKeyName     = document.getElementById("new-key-name");
 const newKeyScope    = document.getElementById("new-key-scope");
+const newKeyExpires  = document.getElementById("new-key-expires");
 const newKeyBtn      = document.getElementById("create-key-btn");
 const newKeyResult   = document.getElementById("new-key-result");
 const newKeyValue    = document.getElementById("new-key-value");
@@ -146,20 +131,33 @@ function renderApiKeys(keys) {
     return;
   }
   if (apiKeysEmpty) apiKeysEmpty.style.display = "none";
-  apiKeysBody.innerHTML = keys.map(k => `
+  const now = Date.now();
+  apiKeysBody.innerHTML = keys.map(k => {
+    const expired = k.expires_at && new Date(k.expires_at).getTime() < now;
+    const expiryLabel = k.expires_at
+      ? (expired
+          ? `<span style="color:var(--color-error);font-size:12px">Expired ${formatDate(k.expires_at)}</span>`
+          : `<span style="font-size:12px;color:var(--color-muted)">${formatDate(k.expires_at)}</span>`)
+      : `<span style="font-size:12px;color:var(--color-muted)">Never</span>`;
+    return `
     <tr>
       <td style="font-weight:600">${escapeHtml(k.name)}</td>
       <td style="font-family:monospace;font-size:13px">${escapeHtml(maskKey(k.prefix))}</td>
       <td><span class="finding-badge">${escapeHtml(k.scope)}</span></td>
       <td style="font-size:13px;color:var(--color-muted)">${formatDate(k.created_at)}</td>
       <td style="font-size:13px;color:var(--color-muted)">${k.last_used_at ? formatDate(k.last_used_at) : "Never"}</td>
+      <td>${expiryLabel}</td>
       <td>
-        <button class="btn-secondary revoke-key-btn" data-key-id="${k.id}"
+        ${k.is_active && !expired
+          ? `<button class="btn-secondary revoke-key-btn" data-key-id="${k.id}"
                 style="font-size:13px;padding:4px 10px;color:var(--color-error)">
-          Revoke
-        </button>
+              Revoke
+             </button>`
+          : `<span style="font-size:12px;color:var(--color-muted);font-style:italic">${expired ? "Expired" : "Revoked"}</span>`
+        }
       </td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   apiKeysBody.querySelectorAll(".revoke-key-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -170,9 +168,8 @@ function renderApiKeys(keys) {
 }
 
 async function loadApiKeys() {
-  if (!orgSlug) return;
   try {
-    const resp = await fetch("/api/v1/apikeys", { headers: orgHeaders() });
+    const resp = await fetch("/api/v1/apikeys", { headers: authHeaders() });
     if (!resp.ok) return;
     const data = await resp.json();
     renderApiKeys(data.items);
@@ -182,7 +179,7 @@ async function loadApiKeys() {
 async function revokeApiKey(id) {
   try {
     const resp = await fetch(`/api/v1/apikeys/${id}`, {
-      method: "DELETE", headers: orgHeaders(),
+      method: "DELETE", headers: authHeaders(),
     });
     if (!resp.ok) { showError(`Revoke failed (${resp.status})`); return; }
     showSuccess("API key revoked.");
@@ -199,12 +196,14 @@ if (newKeyForm) {
       name  = validateApiKeyName(newKeyName.value);
       scope = validateApiKeyScope(newKeyScope.value);
     } catch (err) { showError(err.message); return; }
+    const expiresInDays = newKeyExpires && newKeyExpires.value
+      ? parseInt(newKeyExpires.value, 10) : null;
     if (newKeyBtn) newKeyBtn.disabled = true;
     try {
       const resp = await fetch("/api/v1/apikeys", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...orgHeaders() },
-        body: JSON.stringify(buildApiKeyPayload(name, scope)),
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(buildApiKeyPayload(name, scope, expiresInDays)),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: resp.statusText }));
@@ -215,6 +214,7 @@ if (newKeyForm) {
       if (newKeyResult) newKeyResult.style.display = "";
       if (newKeyValue)  newKeyValue.value = created.key;
       newKeyName.value = "";
+      if (newKeyExpires) newKeyExpires.value = "";
       await loadApiKeys();
       showSuccess("API key created. Copy it now — it won't be shown again.");
     } catch (err) { showError(`Network error: ${err.message}`);
@@ -283,9 +283,8 @@ function renderWebhooks(hooks) {
 }
 
 async function loadWebhooks() {
-  if (!orgSlug) return;
   try {
-    const resp = await fetch("/api/v1/webhooks", { headers: orgHeaders() });
+    const resp = await fetch("/api/v1/webhooks", { headers: authHeaders() });
     if (!resp.ok) return;
     const data = await resp.json();
     renderWebhooks(data.items);
@@ -295,7 +294,7 @@ async function loadWebhooks() {
 async function deleteWebhook(id) {
   try {
     const resp = await fetch(`/api/v1/webhooks/${id}`, {
-      method: "DELETE", headers: orgHeaders(),
+      method: "DELETE", headers: authHeaders(),
     });
     if (!resp.ok) { showError(`Delete failed (${resp.status})`); return; }
     showSuccess("Webhook deleted.");
@@ -306,7 +305,7 @@ async function deleteWebhook(id) {
 async function testWebhook(id) {
   try {
     const resp = await fetch(`/api/v1/webhooks/${id}/test`, {
-      method: "POST", headers: orgHeaders(),
+      method: "POST", headers: authHeaders(),
     });
     if (!resp.ok) { showError(`Test failed (${resp.status})`); return; }
     showSuccess("Test event queued.");
@@ -326,7 +325,7 @@ if (newHookForm) {
     try {
       const resp = await fetch("/api/v1/webhooks", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...orgHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(buildWebhookPayload(url, events)),
       });
       if (!resp.ok) {
@@ -386,9 +385,6 @@ if (pwForm) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {
-  orgSlug = await resolveOrgSlug();
-  const orgNote = document.getElementById("org-context");
-  if (orgNote) orgNote.textContent = orgSlug ? `Org: ${orgSlug}` : "No organization";
   await Promise.all([loadApiKeys(), loadWebhooks()]);
 })();
 

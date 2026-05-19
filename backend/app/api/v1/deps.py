@@ -13,8 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.jwt import decode_token
 from app.config import Settings
 from app.db.database import get_db
-from app.db.models import ApiKey, Membership, Organization, User
-from app.db.org_repository import OrgRepository
+from app.db.models import ApiKey, User
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
@@ -50,7 +49,11 @@ def get_current_user(
             raise credentials_exc
 
         from datetime import datetime, timezone
-        api_key.last_used_at = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=timezone.utc)
+        if api_key.expires_at is not None and api_key.expires_at < now:
+            raise credentials_exc
+
+        api_key.last_used_at = now
         db.commit()
 
         user = db.get(User, api_key.user_id)
@@ -81,23 +84,9 @@ def get_current_user(
     return user
 
 
-def resolve_org_membership(
-    x_org_slug: str | None,
-    current_user: User,
-    db: Session,
-) -> Membership | None:
-    """Return Membership if X-Org-Slug is present and user is a member.
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
 
-    Raises 404 if org not found, 403 if not a member.
-    Returns None if no slug given.
-    """
-    if not x_org_slug:
-        return None
-    repo = OrgRepository(db)
-    org = repo.get_by_slug(x_org_slug)
-    if org is None:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    membership = repo.get_membership(org_id=org.id, user_id=current_user.id)
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Not a member of this organization")
-    return membership
+

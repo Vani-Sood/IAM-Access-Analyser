@@ -15,12 +15,6 @@
     </div>
 
     <div class="login-card">
-      <!-- Tabs -->
-      <div class="modal-tabs" id="auth-tabs">
-        <button class="modal-tab active" id="tab-login"    type="button">Login</button>
-        <button class="modal-tab"        id="tab-register" type="button">Register</button>
-      </div>
-
       <!-- Login Form -->
       <form id="login-form" class="auth-form">
         <label for="login-email">Email</label>
@@ -29,16 +23,6 @@
         <input id="login-password" type="password" placeholder="Password" required autocomplete="current-password" />
         <div class="auth-error" id="login-error" style="display:none"></div>
         <button type="submit" class="btn-primary" style="width:100%;margin-top:8px">Login</button>
-      </form>
-
-      <!-- Register Form -->
-      <form id="register-form" class="auth-form" style="display:none">
-        <label for="reg-email">Email</label>
-        <input id="reg-email" type="email" placeholder="you@example.com" required autocomplete="email" />
-        <label for="reg-password">Password</label>
-        <input id="reg-password" type="password" placeholder="Min 8 characters" required minlength="8" autocomplete="new-password" />
-        <div class="auth-error" id="reg-error" style="display:none"></div>
-        <button type="submit" class="btn-primary" style="width:100%;margin-top:8px">Create Account</button>
       </form>
     </div>
 
@@ -69,23 +53,8 @@
     // Already logged in → skip to app
     if (isLoggedIn()) window.location.replace("analyze.html");
 
-    // ── tab switching ────────────────────────────────────────────────────────
-    const loginForm    = document.getElementById("login-form");
-    const registerForm = document.getElementById("register-form");
-    const forcePwCard  = document.getElementById("force-pw-card");
-
-    document.getElementById("tab-login").addEventListener("click", () => {
-      loginForm.style.display    = "";
-      registerForm.style.display = "none";
-      document.getElementById("tab-login").classList.add("active");
-      document.getElementById("tab-register").classList.remove("active");
-    });
-    document.getElementById("tab-register").addEventListener("click", () => {
-      loginForm.style.display    = "none";
-      registerForm.style.display = "";
-      document.getElementById("tab-register").classList.add("active");
-      document.getElementById("tab-login").classList.remove("active");
-    });
+    const loginForm   = document.getElementById("login-form");
+    const forcePwCard = document.getElementById("force-pw-card");
 
     // ── helpers ──────────────────────────────────────────────────────────────
     function showError(id, msg) {
@@ -122,37 +91,6 @@
         }
       } catch {
         showError("login-error", "Network error — is the server running?");
-      }
-    });
-
-    // ── register ─────────────────────────────────────────────────────────────
-    registerForm.addEventListener("submit", async e => {
-      e.preventDefault();
-      hideError("reg-error");
-      const email    = document.getElementById("reg-email").value.trim();
-      const password = document.getElementById("reg-password").value;
-      try {
-        const resp = await fetch("/api/v1/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) { showError("reg-error", data.detail || "Registration failed"); return; }
-        // auto-login
-        const loginResp = await fetch("/api/v1/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const loginData = await loginResp.json();
-        if (loginResp.ok) {
-          setToken(loginData.access_token);
-          if (loginData.refresh_token) setRefreshToken(loginData.refresh_token);
-          window.location.href = "analyze.html";
-        }
-      } catch {
-        showError("reg-error", "Network error");
       }
     });
 

@@ -12,11 +12,14 @@ def create_access_token(
     sub: str,
     secret: str,
     ttl_minutes: int = 15,
+    is_admin: bool = False,
 ) -> str:
     """Create a short-lived access JWT."""
     now = datetime.now(tz=timezone.utc)
     payload = {
         "sub": sub,
+        "email": sub,
+        "is_admin": is_admin,
         "type": "access",
         "iat": now,
         "exp": now + timedelta(minutes=ttl_minutes),

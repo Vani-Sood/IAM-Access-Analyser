@@ -1,21 +1,19 @@
-"""Webhook management endpoints — Batch 23."""
+"""Webhook management endpoints."""
 from __future__ import annotations
 
 import ipaddress
 import json
-import re
 import secrets
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_user
 from app.db.database import get_db
 from app.db.models import User, Webhook
-from app.db.org_repository import OrgRepository
 from app.worker.webhook_delivery import deliver_webhook
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
@@ -100,38 +98,20 @@ class WebhookListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _resolve_org(slug: str | None, user: User, db: Session):
-    if not slug:
-        raise HTTPException(status_code=400, detail="X-Org-Slug header required")
-    repo = OrgRepository(db)
-    org = repo.get_by_slug(slug)
-    if org is None:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    membership = repo.get_membership(org_id=org.id, user_id=user.id)
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Not a member of this organization")
-    return org
-
-
-# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 @router.post("", response_model=WebhookCreatedResponse)
 def register_webhook(
     req: RegisterWebhookRequest,
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> WebhookCreatedResponse:
-    org = _resolve_org(x_org_slug, current_user, db)
     secret = secrets.token_hex(32)
 
     hook = Webhook(
-        org_id=org.id,
+        user_id=current_user.id,
+        org_id=None,
         url=req.url,
         secret=secret,
         events=json.dumps(req.events),
@@ -155,12 +135,10 @@ def register_webhook(
 
 @router.get("", response_model=WebhookListResponse)
 def list_webhooks(
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> WebhookListResponse:
-    org = _resolve_org(x_org_slug, current_user, db)
-    hooks = db.query(Webhook).filter(Webhook.org_id == org.id).all()
+    hooks = db.query(Webhook).filter(Webhook.user_id == current_user.id).all()
     return WebhookListResponse(
         items=[
             WebhookListItem(
@@ -179,13 +157,11 @@ def list_webhooks(
 @router.delete("/{hook_id}", response_model=dict)
 def delete_webhook(
     hook_id: int,
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    org = _resolve_org(x_org_slug, current_user, db)
     hook = db.query(Webhook).filter(
-        Webhook.id == hook_id, Webhook.org_id == org.id
+        Webhook.id == hook_id, Webhook.user_id == current_user.id
     ).first()
     if hook is None:
         raise HTTPException(status_code=404, detail="Webhook not found")
@@ -197,13 +173,11 @@ def delete_webhook(
 @router.post("/{hook_id}/test", response_model=dict)
 def test_webhook(
     hook_id: int,
-    x_org_slug: str | None = Header(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    org = _resolve_org(x_org_slug, current_user, db)
     hook = db.query(Webhook).filter(
-        Webhook.id == hook_id, Webhook.org_id == org.id
+        Webhook.id == hook_id, Webhook.user_id == current_user.id
     ).first()
     if hook is None:
         raise HTTPException(status_code=404, detail="Webhook not found")
@@ -211,6 +185,6 @@ def test_webhook(
     deliver_webhook.delay(
         hook_id,
         "analysis.complete",
-        {"event": "analysis.complete", "org": org.slug, "data": {"test": True}},
+        {"analysis_id": hook_id, "risk_score": 0.0, "severity": "test", "test": True},
     )
     return {"queued": True, "webhook_id": hook_id}

@@ -93,7 +93,7 @@
             No members found.
           </p>
 
-          <!-- Add member form (hidden for non-admins) -->
+          <!-- Add member form (hidden for non-owners) -->
           <form id="add-member-form" style="display:none;margin-top:var(--space-lg);
                 border-top:1px solid var(--color-hairline);padding-top:var(--space-lg)">
             <div class="section-title" style="margin-bottom:var(--space-md)">
@@ -114,8 +114,7 @@
                               margin-bottom:4px" for="add-role">Role</label>
                 <select id="add-role" class="history-filter-select">
                   <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                  <option value="owner">Owner</option>
+                  <option value="manager" id="role-manager-opt">Manager</option>
                 </select>
               </div>
               <button type="submit" class="btn-primary" id="add-member-btn"

@@ -3,10 +3,10 @@
 // ── pure functions (exported for tests) ───────────────────────────────────────
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const VALID_ROLES = new Set(["owner", "admin", "member"]);
+const VALID_ROLES = new Set(["creator", "manager", "member"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const ROLE_RANK = { owner: 3, admin: 2, member: 1 };
+const ROLE_RANK = { creator: 3, manager: 2, member: 1 };
 
 function validateOrgName(name) {
   const trimmed = (name || "").trim();
@@ -25,7 +25,7 @@ function validateSlug(slug) {
 
 function validateRole(role) {
   if (!VALID_ROLES.has(role)) {
-    throw new Error(`role must be one of: owner, admin, member`);
+    throw new Error(`role must be one of: creator, manager, member`);
   }
   return role;
 }
@@ -145,7 +145,7 @@ function renderMembers(members) {
         ${canAdmin && m.role !== "owner" ? `
           <select class="role-select history-filter-select" data-user-id="${m.id}"
                   style="font-size:13px;height:30px">
-            ${["owner","admin","member"].map(r =>
+            ${(currentRole === "creator" ? ["manager","member"] : ["member"]).map(r =>
               `<option value="${r}"${r === m.role ? " selected" : ""}>${r}</option>`
             ).join("")}
           </select>` : `<span class="finding-badge">${escapeHtml(m.role)}</span>`
@@ -193,7 +193,7 @@ async function selectOrg(slug) {
     const data = await resp.json();
 
     const payload = getUserPayload();
-    const myEmail = payload?.email || "";
+    const myEmail = payload?.sub || payload?.email || "";
     const me = data.members.find(m => m.email === myEmail);
     currentRole = me ? me.role : "member";
 
@@ -201,6 +201,8 @@ async function selectOrg(slug) {
 
     if (addMemberForm) {
       addMemberForm.style.display = canManageMembers(currentRole) ? "" : "none";
+      const managerOpt = document.getElementById("role-manager-opt");
+      if (managerOpt) managerOpt.style.display = currentRole === "creator" ? "" : "none";
     }
   } catch (err) {
     showError(`Network error: ${err.message}`);

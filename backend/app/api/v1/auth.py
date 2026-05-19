@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import require_admin
 from app.auth.hashing import hash_password, verify_password
 from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.config import Settings
@@ -87,11 +88,16 @@ class RefreshResponse(BaseModel):
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 @limiter.limit("3/minute")
 def register(
-    request: Request, body: RegisterRequest, db: Session = Depends(get_db)
+    request: Request,
+    body: RegisterRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
 ) -> RegisterResponse:
     user = User(
         email=body.email,
         hashed_password=hash_password(body.password),
+        is_active=False,
+        is_admin=False,
     )
     db.add(user)
     try:
@@ -135,6 +141,7 @@ def login(
         sub=user.email,
         secret=settings.jwt_secret,
         ttl_minutes=settings.jwt_access_ttl_minutes,
+        is_admin=user.is_admin,
     )
     refresh = create_refresh_token(
         sub=user.email,

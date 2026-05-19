@@ -42,6 +42,31 @@
         Scoped to the current organization.
       </p>
 
+      <!-- How to use API key -->
+      <details style="margin-bottom:var(--space-lg);border:1px solid var(--color-border);
+                      border-radius:8px;padding:var(--space-md)">
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;user-select:none">
+          How to use an API key
+        </summary>
+        <div style="margin-top:var(--space-md);font-size:13px;color:var(--color-muted);line-height:1.7">
+          <p style="margin-bottom:8px">Pass the key in the <code>Authorization</code> header with the <code>ApiKey</code> prefix:</p>
+          <pre style="background:var(--color-surface-2,#f4f4f5);border-radius:6px;
+                      padding:10px 14px;font-size:12px;overflow-x:auto;margin-bottom:12px">Authorization: ApiKey &lt;your-key&gt;</pre>
+          <p style="margin-bottom:8px"><strong>curl example:</strong></p>
+          <pre style="background:var(--color-surface-2,#f4f4f5);border-radius:6px;
+                      padding:10px 14px;font-size:12px;overflow-x:auto;margin-bottom:12px">curl -X POST https://your-host/api/v1/analyze \
+  -H "Authorization: ApiKey &lt;your-key&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"json","policy":{...}}'</pre>
+          <p style="margin-bottom:4px"><strong>Scopes:</strong></p>
+          <ul style="margin:0 0 0 16px;padding:0">
+            <li><code>read</code> — GET endpoints only</li>
+            <li><code>readwrite</code> — GET + POST (run analyses, manage resources)</li>
+            <li><code>admin</code> — full access including org management</li>
+          </ul>
+        </div>
+      </details>
+
       <!-- Create key form -->
       <form id="new-apikey-form"
             style="display:flex;gap:var(--space-sm);align-items:flex-end;
@@ -59,6 +84,12 @@
             <option value="readwrite">readwrite</option>
             <option value="admin">admin</option>
           </select>
+        </div>
+        <div>
+          <label class="settings-label" for="new-key-expires">Expires in (days)</label>
+          <input id="new-key-expires" type="number" class="input-field"
+                 placeholder="Never" min="1" max="365"
+                 style="width:120px" />
         </div>
         <button type="submit" class="btn-primary" id="create-key-btn">
           Create Key
@@ -87,7 +118,7 @@
           <thead>
             <tr>
               <th>Name</th><th>Prefix</th><th>Scope</th>
-              <th>Created</th><th>Last Used</th><th></th>
+              <th>Created</th><th>Last Used</th><th>Expires</th><th></th>
             </tr>
           </thead>
           <tbody id="apikeys-body"></tbody>

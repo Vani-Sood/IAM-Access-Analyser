@@ -7,11 +7,11 @@ import logging
 import re
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_user, resolve_org_membership
+from app.api.v1.deps import get_current_user
 from app.config import Settings
 from app.db.database import get_db
 from app.db.models import User
@@ -106,14 +106,9 @@ def _normalize_policy(cloud: str, raw: dict) -> dict:
 def analyze_policy(
     request: Request,
     req: AnalyzeRequest,
-    x_org_slug: str | None = Header(default=None, alias="X-Org-Slug"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AnalyzeResponse:
-    # Resolve org context (raises 404/403 if slug invalid or non-member)
-    membership = resolve_org_membership(x_org_slug, current_user, db)
-    org_id: int | None = membership.org_id if membership else None
-
     if req.mode == "json":
         normalized = _normalize_policy(req.cloud, req.policy)  # type: ignore[arg-type]
         policy_for_worker = normalized
@@ -135,7 +130,7 @@ def analyze_policy(
         suggestions_json="{}",
         graph_data_json='{"nodes":[],"edges":[]}',
         status="pending",
-        org_id=org_id,
+        org_id=None,
     )
     db.commit()
 

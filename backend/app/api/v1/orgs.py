@@ -8,7 +8,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_user
+from app.api.v1.deps import get_current_user, require_admin
 from app.db.database import get_db
 from app.db.models import User
 from app.db.org_repository import OrgRepository
@@ -16,7 +16,7 @@ from app.db.org_repository import OrgRepository
 router = APIRouter(prefix="/api/v1/orgs", tags=["orgs"])
 
 _SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_VALID_ROLES = {"owner", "admin", "member"}
+_VALID_ROLES = {"creator", "manager", "member"}
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
@@ -101,7 +101,7 @@ def _require_org_member(db: Session, slug: str, user: User, min_role: str = "mem
     return org, membership, repo
 
 
-_ROLE_RANK = {"owner": 3, "admin": 2, "member": 1}
+_ROLE_RANK = {"creator": 3, "manager": 2, "member": 1}
 
 
 def _check_role(actual: str, required: str) -> None:
@@ -116,12 +116,12 @@ def _check_role(actual: str, required: str) -> None:
 def create_org(
     req: CreateOrgRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ) -> OrgResponse:
     repo = OrgRepository(db)
     try:
         org = repo.create_org(name=req.name, slug=req.slug)
-        repo.add_member(org_id=org.id, user_id=current_user.id, role="owner")
+        repo.add_member(org_id=org.id, user_id=current_user.id, role="creator")
         db.commit()
     except IntegrityError:
         raise HTTPException(status_code=409, detail="Organization slug already taken")
@@ -177,7 +177,11 @@ def add_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> MemberEntry:
-    org, _, repo = _require_org_member(db, slug, current_user, min_role="admin")
+    org, actor_m, repo = _require_org_member(db, slug, current_user, min_role="manager")
+
+    # managers can only add as "member"; only creator can assign "manager"
+    if actor_m.role == "manager" and req.role != "member":
+        raise HTTPException(status_code=403, detail="Managers can only add members")
 
     target = db.query(User).filter(User.email == req.email).first()
     if target is None:
@@ -212,15 +216,26 @@ def remove_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    org, _, repo = _require_org_member(db, slug, current_user, min_role="owner")
+    org, _, repo = _require_org_member(db, slug, current_user, min_role="manager")
 
     target_m = repo.get_membership(org_id=org.id, user_id=user_id)
     if target_m is None:
         raise HTTPException(status_code=404, detail="Member not found in organization")
 
-    # Prevent removing last owner
-    if target_m.role == "owner" and repo.count_owners(org.id) <= 1:
-        raise HTTPException(status_code=409, detail="Cannot remove the last owner")
+    creator_id = repo.get_creator_user_id(org.id)
+
+    # Creator cannot be removed by anyone
+    if target_m.user_id == creator_id:
+        raise HTTPException(status_code=403, detail="Cannot remove the organization creator")
+
+    # Manager cannot remove another manager or creator — only creator can
+    actor_m = repo.get_membership(org_id=org.id, user_id=current_user.id)
+    if _ROLE_RANK.get(actor_m.role, 0) <= _ROLE_RANK.get(target_m.role, 0):
+        raise HTTPException(status_code=403, detail="Cannot remove a member with equal or higher role")
+
+    # Prevent removing last creator
+    if target_m.role == "creator" and repo.count_owners(org.id) <= 1:
+        raise HTTPException(status_code=409, detail="Cannot remove the last creator")
 
     repo.remove_member(org_id=org.id, user_id=user_id)
     db.commit()
@@ -245,15 +260,26 @@ def change_member_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> MemberEntry:
-    org, _, repo = _require_org_member(db, slug, current_user, min_role="owner")
+    org, _, repo = _require_org_member(db, slug, current_user, min_role="creator")
 
     target_m = repo.get_membership(org_id=org.id, user_id=user_id)
     if target_m is None:
         raise HTTPException(status_code=404, detail="Member not found in organization")
 
-    # Prevent demoting last owner
-    if target_m.role == "owner" and req.role != "owner" and repo.count_owners(org.id) <= 1:
-        raise HTTPException(status_code=409, detail="Cannot demote the last owner")
+    creator_id = repo.get_creator_user_id(org.id)
+
+    # Creator cannot be demoted by anyone
+    if target_m.user_id == creator_id and req.role != "creator":
+        raise HTTPException(status_code=403, detail="Cannot demote the organization creator")
+
+    # Only creator can change roles — enforced by min_role="creator" above
+    actor_m = repo.get_membership(org_id=org.id, user_id=current_user.id)
+    if _ROLE_RANK.get(actor_m.role, 0) <= _ROLE_RANK.get(target_m.role, 0) and target_m.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot change role of a member with equal or higher role")
+
+    # Prevent demoting last creator
+    if target_m.role == "creator" and req.role != "creator" and repo.count_owners(org.id) <= 1:
+        raise HTTPException(status_code=409, detail="Cannot demote the last creator")
 
     m = repo.change_role(org_id=org.id, user_id=user_id, role=req.role)
     db.commit()

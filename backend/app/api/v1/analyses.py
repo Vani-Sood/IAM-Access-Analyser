@@ -4,29 +4,17 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_user, resolve_org_membership
+from app.api.v1.deps import get_current_user
 from app.db.database import get_db
 from app.db.models import User
 from app.db.repository import AnalysisRepository
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
-
-
-def _check_analysis_access(record, current_user: User, db: Session) -> None:
-    """If analysis belongs to an org, verify current_user is a member."""
-    if record.org_id is None:
-        return
-    from app.db.org_repository import OrgRepository
-
-    repo = OrgRepository(db)
-    membership = repo.get_membership(org_id=record.org_id, user_id=current_user.id)
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Access denied — not a member of this organization")
 
 
 class AnalysisSummary(BaseModel):
@@ -91,19 +79,12 @@ class PrivescResponse(BaseModel):
 def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    x_org_slug: str | None = Header(default=None, alias="X-Org-Slug"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ) -> AnalysisListResponse:
-    membership = resolve_org_membership(x_org_slug, current_user, db)
     repo = AnalysisRepository(db)
-
-    if membership:
-        records = repo.list_by_org(membership.org_id, limit=limit, offset=offset)
-        total = repo.count_by_org(membership.org_id)
-    else:
-        records = repo.list_all(limit=limit, offset=offset)
-        total = repo.count()
+    records = repo.list_all(limit=limit, offset=offset)
+    total = repo.count()
 
     items = [
         AnalysisSummary(
@@ -424,14 +405,12 @@ def get_compliance(
 def get_analysis(
     analysis_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ) -> AnalysisDetail:
     repo = AnalysisRepository(db)
     record = repo.get_by_id(analysis_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
-
-    _check_analysis_access(record, current_user, db)
 
     return AnalysisDetail(
         id=record.id,

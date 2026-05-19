@@ -1,4 +1,4 @@
-"""Webhook delivery Celery task with HMAC-SHA256 signing and retry — Batch 23."""
+"""Webhook delivery Celery task with HMAC-SHA256 signing and retry."""
 from __future__ import annotations
 
 import hashlib
@@ -14,11 +14,97 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 10
 
+# Discord embed colors per event
+_DISCORD_COLORS = {
+    "privesc.detected":  0xE74C3C,  # red
+    "compliance.failed": 0xE67E22,  # orange
+    "analysis.complete": 0x3498DB,  # blue
+}
+
+_EVENT_TITLES = {
+    "privesc.detected":  "Privilege Escalation Detected",
+    "compliance.failed": "Compliance Check Failed",
+    "analysis.complete": "IAM Policy Analysis Complete",
+}
+
+_EVENT_EMOJI = {
+    "privesc.detected":  "🔴",
+    "compliance.failed": "🟠",
+    "analysis.complete": "🔵",
+}
+
 
 def _sign_payload(body: bytes, secret: str) -> str:
-    """Return HMAC-SHA256 signature string in the format 'sha256=<hex>'."""
     digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
+
+
+def _is_discord_url(url: str) -> bool:
+    return "discord.com/api/webhooks/" in url
+
+
+def _is_slack_url(url: str) -> bool:
+    return "hooks.slack.com/services/" in url
+
+
+def _discord_payload(event: str, data: dict) -> dict:
+    analysis_id = data.get("analysis_id", "?")
+    title = _EVENT_TITLES.get(event, event)
+    emoji = _EVENT_EMOJI.get(event, "📋")
+    color = _DISCORD_COLORS.get(event, 0x95A5A6)
+
+    fields = []
+    if data.get("risk_score") is not None:
+        fields.append({
+            "name": "Risk Score",
+            "value": str(data["risk_score"]),
+            "inline": True,
+        })
+    if data.get("severity"):
+        fields.append({
+            "name": "Severity",
+            "value": data["severity"].upper(),
+            "inline": True,
+        })
+    if data.get("framework"):
+        fields.append({
+            "name": "Framework",
+            "value": data["framework"].upper(),
+            "inline": True,
+        })
+
+    return {
+        "embeds": [{
+            "title": f"{emoji} {title}",
+            "description": f"Analysis **#{analysis_id}** triggered this alert.",
+            "color": color,
+            "fields": fields,
+            "footer": {"text": "IAM Policy Analyzer"},
+        }]
+    }
+
+
+def _slack_payload(event: str, data: dict) -> dict:
+    analysis_id = data.get("analysis_id", "?")
+    title = _EVENT_TITLES.get(event, event)
+    emoji = _EVENT_EMOJI.get(event, "📋")
+
+    lines = [f"*{emoji} {title}*", f"Analysis *#{analysis_id}*"]
+    if data.get("risk_score") is not None:
+        lines.append(f"Risk Score: `{data['risk_score']}`")
+    if data.get("severity"):
+        lines.append(f"Severity: `{data['severity'].upper()}`")
+    if data.get("framework"):
+        lines.append(f"Framework: `{data['framework'].upper()}`")
+
+    text = "\n".join(lines)
+    return {
+        "text": f"{emoji} {title} — Analysis #{analysis_id}",
+        "blocks": [{
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": text},
+        }],
+    }
 
 
 def _do_deliver(
@@ -28,7 +114,6 @@ def _do_deliver(
     *,
     db_session=None,
 ) -> None:
-    """Deliver one webhook. If db_session is None, creates its own session."""
     owns_session = db_session is None
     if owns_session:
         from app.db.database import _get_session_factory
@@ -44,14 +129,22 @@ def _do_deliver(
         if event not in subscribed:
             return
 
-        body = json.dumps(payload, separators=(",", ":")).encode()
-        signature = _sign_payload(body, hook.secret)
-
-        headers = {
-            "Content-Type": "application/json",
-            "X-Vani-Event": event,
-            "X-Vani-Signature": signature,
-        }
+        if _is_discord_url(hook.url):
+            body_dict = _discord_payload(event, payload)
+            body = json.dumps(body_dict, separators=(",", ":")).encode()
+            headers = {"Content-Type": "application/json"}
+        elif _is_slack_url(hook.url):
+            body_dict = _slack_payload(event, payload)
+            body = json.dumps(body_dict, separators=(",", ":")).encode()
+            headers = {"Content-Type": "application/json"}
+        else:
+            body = json.dumps(payload, separators=(",", ":")).encode()
+            signature = _sign_payload(body, hook.secret)
+            headers = {
+                "Content-Type": "application/json",
+                "X-Vani-Event": event,
+                "X-Vani-Signature": signature,
+            }
 
         resp = requests.post(hook.url, data=body, headers=headers, timeout=_TIMEOUT)
         resp.raise_for_status()
@@ -74,7 +167,6 @@ def deliver_webhook(
     event: str,
     payload: dict,
 ) -> None:
-    """Celery task: deliver webhook payload with exponential backoff retry."""
     try:
         _do_deliver(webhook_id, event, payload)
     except Exception as exc:
