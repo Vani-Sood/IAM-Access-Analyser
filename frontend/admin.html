@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin — IAM Analyzer</title>
+  <title>Audit Log — IAM Analyzer</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -26,84 +26,6 @@
       <span id="error-message"></span>
     </div>
 
-    <!-- Create User card -->
-    <div class="section-card" style="margin-bottom:var(--space-xl)">
-      <div class="section-title">Create User</div>
-      <p style="font-size:14px;color:var(--color-muted);margin-bottom:var(--space-lg)">
-        Accounts are created by admins only. New users must change password on first login.
-      </p>
-      <div id="create-user-error" class="error-banner" role="alert" style="margin-bottom:12px">
-        <span id="create-user-error-msg"></span>
-      </div>
-      <div id="create-user-success" style="display:none;padding:10px 14px;border-radius:6px;
-           background:var(--color-ok,#22c55e)20;color:var(--color-ok,#16a34a);
-           font-size:14px;margin-bottom:12px"></div>
-      <form id="create-user-form" style="display:grid;gap:12px;max-width:400px">
-        <div>
-          <label for="new-user-email" style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Email</label>
-          <input id="new-user-email" type="email" placeholder="user@example.com" required
-                 style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--color-border);
-                        background:var(--color-surface);font-size:14px;box-sizing:border-box" />
-        </div>
-        <div>
-          <label for="new-user-password" style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Temporary Password</label>
-          <input id="new-user-password" type="password" placeholder="Min 8 chars, 1 uppercase, 1 digit" required minlength="8"
-                 style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--color-border);
-                        background:var(--color-surface);font-size:14px;box-sizing:border-box" />
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <input id="new-user-is-admin" type="checkbox" style="width:16px;height:16px" />
-          <label for="new-user-is-admin" style="font-size:13px">Grant admin access</label>
-        </div>
-        <button type="submit" id="create-user-btn" class="btn-primary" style="width:fit-content">
-          Create User
-        </button>
-      </form>
-    </div>
-
-    <!-- Pending Users card -->
-    <div class="section-card" style="margin-bottom:var(--space-xl)">
-      <div class="section-title">Pending Approvals</div>
-      <p style="font-size:14px;color:var(--color-muted);margin-bottom:var(--space-lg)">
-        New registrations are inactive until approved here.
-      </p>
-      <p id="pending-empty" style="display:none;color:var(--color-muted);font-size:14px;
-                                    padding:var(--space-lg) 0;text-align:center">
-        No pending registrations.
-      </p>
-      <div style="overflow-x:auto">
-        <table class="history-table" id="pending-table" aria-label="Pending users" style="display:none">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Registered</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="pending-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- All Users card -->
-    <div class="section-card" style="margin-bottom:var(--space-xl)">
-      <div class="section-title">All Users</div>
-      <div style="overflow-x:auto">
-        <table class="history-table" id="users-table" aria-label="All users">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Role</th>
-              <th>Registered</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="users-body"></tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Audit Log card -->
     <div class="section-card">
 
@@ -114,17 +36,11 @@
                 aria-label="Filter by event type">
           <option value="">All Events</option>
           <optgroup label="Auth">
-            <option value="user.login">user.login</option>
-            <option value="user.register">user.register</option>
-            <option value="user.password_change">user.password_change</option>
-          </optgroup>
-          <optgroup label="Org">
-            <option value="org.create">org.create</option>
-            <option value="org.member_add">org.member_add</option>
-            <option value="org.member_remove">org.member_remove</option>
-            <option value="org.member_role_change">org.member_role_change</option>
+            <option value="auth.login">auth.login</option>
+            <option value="auth.register">auth.register</option>
           </optgroup>
           <optgroup label="Analysis">
+            <option value="analyze.create">analyze.create</option>
             <option value="analysis.complete">analysis.complete</option>
           </optgroup>
         </select>

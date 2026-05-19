@@ -65,6 +65,22 @@ require_sudo_or_root() {
 
 # ── 2. Container engine: pick podman if installed, else install docker ───────
 
+DOCKER_GROUP_ADDED=0   # track if we just added user to docker group
+
+ensure_docker_group() {
+  # Skip for root or podman (podman uses user socket, no group needed)
+  [ "$(id -u)" -eq 0 ] && return
+  [ "${ENGINE:-}" = "podman" ] && return
+  local user="${SUDO_USER:-${USER:-$(id -un)}}"
+  if id -nG "$user" 2>/dev/null | grep -qw docker; then
+    return   # already in group
+  fi
+  info "Adding $user to 'docker' group..."
+  $SUDO usermod -aG docker "$user" || { warn "usermod failed — may need to run as root"; return; }
+  DOCKER_GROUP_ADDED=1
+  warn "Added to 'docker' group. Using 'sg docker' for this session (no logout needed)."
+}
+
 setup_container_engine() {
   local docker_ver=""
   if command -v docker >/dev/null; then
@@ -90,7 +106,10 @@ setup_container_engine() {
     start_docker_daemon
   fi
 
-  if ! docker compose version >/dev/null 2>&1; then
+  ensure_docker_group
+
+  if ! docker compose version >/dev/null 2>&1 && \
+     ! sg docker -c "docker compose version" >/dev/null 2>&1; then
     info "Installing docker compose plugin"
     install_compose_plugin
   fi
@@ -112,11 +131,7 @@ install_docker() {
       ;;
   esac
 
-  # Add current user to docker group
-  if [ -n "${SUDO}" ] && [ -n "${SUDO_USER:-${USER:-}}" ]; then
-    $SUDO usermod -aG docker "${SUDO_USER:-$USER}" || true
-    warn "Added $USER to 'docker' group. Log out & back in if commands need root."
-  fi
+  # Group membership handled by ensure_docker_group after engine detection
 }
 
 install_docker_podman_shim() {
@@ -552,7 +567,14 @@ upsert_env() {
 bring_up_stack() {
   echo
   info "Building images (first run ~5min)..."
-  docker compose up -d --build || fatal "Stack failed to start. Check: docker compose logs"
+  if [ "${DOCKER_GROUP_ADDED:-0}" = "1" ]; then
+    # Group just granted — use sg so we don't need logout
+    sg docker -c "docker compose up -d --build" \
+      || fatal "Stack failed to start. Check: docker compose logs"
+  else
+    docker compose up -d --build \
+      || fatal "Stack failed to start. Check: docker compose logs"
+  fi
   sleep 5
   info "Health check..."
   for i in 1 2 3 4 5 6 7 8 9 10; do

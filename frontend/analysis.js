@@ -92,6 +92,9 @@ function buildNodeOptions(nodes, allowedTypes) {
   return nodes.filter(n => allowedTypes.includes(n.node_type));
 }
 
+// node ID → label lookup — must be in outer scope so renderInheritanceResult can close over it
+let _nodeLabelMap = {};
+
 function renderInheritanceResult(data) {
   const fromLabel = _nodeLabelMap[data.from_node] || data.from_node;
   const toLabel   = _nodeLabelMap[data.to_node]   || data.to_node;
@@ -178,9 +181,6 @@ const inheritanceTo           = document.getElementById("inheritance-to");
 const runInheritanceBtn       = document.getElementById("run-inheritance-btn");
 const inheritanceLoadingEl    = document.getElementById("inheritance-loading");
 const inheritanceResult       = document.getElementById("inheritance-result");
-
-// node ID → label lookup, populated when graph loads
-let _nodeLabelMap = {};
 
 function showError(msg) {
   if (errorMsg)    errorMsg.textContent = msg;
