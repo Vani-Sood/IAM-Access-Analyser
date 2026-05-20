@@ -216,7 +216,3 @@ IAM-Access-Analyser/
 | `GCP_PROJECT_ID` | No | For live GCP scanning |
 
 ---
-
-## License
-
-MIT
