@@ -64,7 +64,10 @@ let serverTotal    = 0;
 
 function showError(msg) {
   if (errorMsg)    errorMsg.textContent = msg;
-  if (errorBanner) errorBanner.classList.add("active");
+  if (errorBanner) {
+    errorBanner.classList.add("active");
+    setTimeout(() => errorBanner.classList.remove("active"), 30000);
+  }
 }
 
 function setLoading(active) {

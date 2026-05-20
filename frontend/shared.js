@@ -125,7 +125,7 @@ function renderNav(activePage) {
     { href: "dashboard.html", label: "Dashboard", key: "dashboard" },
     { href: "settings.html",  label: "Settings",  key: "settings"  },
   ];
-  if (admin) links.push({ href: "admin.html", label: "Admin", key: "admin" });
+  if (admin) links.push({ href: "admin.html", label: "Audit Logs", key: "admin" });
 
   const navLinks = links.map(({ href, label, key }) => {
     const active = key === activePage ? ' class="nav-active"' : "";

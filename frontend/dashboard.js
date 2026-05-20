@@ -76,6 +76,7 @@ function setLoading(active) {
 function showError(msg) {
   errorMessage.textContent = msg;
   errorBanner.classList.add("active");
+  setTimeout(() => errorBanner.classList.remove("active"), 30000);
 }
 function clearError() { errorBanner.classList.remove("active"); }
 

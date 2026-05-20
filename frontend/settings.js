@@ -84,14 +84,20 @@ const successMsg     = document.getElementById("success-message");
 
 function showError(msg) {
   if (errorMsg)    errorMsg.textContent = msg;
-  if (errorBanner) errorBanner.classList.add("active");
   if (successBanner) successBanner.classList.remove("active");
+  if (errorBanner) {
+    errorBanner.classList.add("active");
+    setTimeout(() => errorBanner.classList.remove("active"), 30000);
+  }
 }
 
 function showSuccess(msg) {
   if (successMsg)    successMsg.textContent = msg;
-  if (successBanner) successBanner.classList.add("active");
   if (errorBanner)   errorBanner.classList.remove("active");
+  if (successBanner) {
+    successBanner.classList.add("active");
+    setTimeout(() => successBanner.classList.remove("active"), 30000);
+  }
 }
 
 function clearMessages() {
@@ -110,29 +116,6 @@ function formatDate(isoStr) {
   if (!isoStr) return "—";
   const d = new Date(isoStr);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-// ── Session Token section ─────────────────────────────────────────────────────
-const sessionTokenEl  = document.getElementById("session-token-value");
-const toggleTokenBtn  = document.getElementById("toggle-token-btn");
-const copyTokenBtn    = document.getElementById("copy-token-btn");
-
-if (sessionTokenEl) sessionTokenEl.value = getToken() || "";
-
-if (toggleTokenBtn && sessionTokenEl) {
-  toggleTokenBtn.addEventListener("click", () => {
-    const hidden = sessionTokenEl.type === "password";
-    sessionTokenEl.type = hidden ? "text" : "password";
-    toggleTokenBtn.textContent = hidden ? "Hide" : "Show";
-  });
-}
-
-if (copyTokenBtn && sessionTokenEl) {
-  copyTokenBtn.addEventListener("click", () => {
-    navigator.clipboard.writeText(sessionTokenEl.value).catch(() => {});
-    copyTokenBtn.textContent = "Copied!";
-    setTimeout(() => { copyTokenBtn.textContent = "Copy"; }, 2000);
-  });
 }
 
 // ── API Keys section ──────────────────────────────────────────────────────────
