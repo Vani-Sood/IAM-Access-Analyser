@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
 # setup-machine.sh — One-shot bootstrap for IAM-Access-Analyser on Kali / Parrot / Debian-family Linux.
-#
-# - Detects Docker or Podman
-# - Installs Docker if missing (Kali/Parrot/Ubuntu/Debian)
-# - Starts daemon / podman socket
-# - Installs awscli + google-cloud-cli (so cred validation works on fresh OS)
-# - Generates strong DB + JWT secrets
-# - Prompts for admin email/password
-# - Optionally prompts for AWS / Azure / GCP credentials
-# - Validates each cloud credential set against required permissions
-# - Builds and brings up the stack
-#
-# Usage: bash setup-machine.sh
-#
-# Reads/writes: .env at repo root.
-# Reads:       getkeys.md (just to remind user where credential docs live).
-# Tested:      Kali 2024.x, Parrot 6.x, Ubuntu 22.04+, Debian 12.
 
 set -euo pipefail
 
@@ -617,23 +601,6 @@ print_summary() {
   echo "${BLD}═══════════════════════════════════════════════════════════════════${RST}"
   echo
   echo "Open:    ${CYN}http://localhost:8000/${RST}    (frontend)"
-  echo "Docs:    ${CYN}http://localhost:8000/docs${RST} (Swagger)"
-  echo "Neo4j:   ${CYN}http://localhost:7474/${RST}    (graph browser)"
-  echo
-  echo "Login with the admin account you just set."
-  echo
-  echo "${BLD}Useful commands:${RST}"
-  echo "  docker compose ps           # service status"
-  echo "  docker compose logs -f      # tail all logs"
-  echo "  make test                   # run backend tests"
-  echo "  make test-frontend          # run frontend tests"
-  echo "  docker compose down         # stop"
-  echo "  docker compose down -v      # stop + wipe data"
-  echo
-  echo "${BLD}Did not configure a cloud above?${RST} Read ${YEL}getkeys.md${RST} for step-by-step"
-  echo "guides for AWS, Azure, and GCP. Re-run this script (or edit .env manually)"
-  echo "to add them later, then: ${CYN}docker compose restart backend celery-worker${RST}"
-  echo
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────
